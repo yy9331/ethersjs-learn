@@ -1,0 +1,13 @@
+{
+  "name": "etherjs-learn",
+  "version": "1.0.0",
+  "main": "HelloVitalik.js",
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^17.0.1",
+    "ethers": "^6.15.0"
+  }
+}
