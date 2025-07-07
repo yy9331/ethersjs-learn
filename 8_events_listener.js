@@ -5,17 +5,10 @@
 // contractUSDT.once("事件名", Listener)
 
 import { ethers } from "ethers";
-import { providerEthByAlchemy as provider } from "./0_initWallet.js"
+import { providerEthByAlchemy as provider, eventTransferAbi, contractAddressUSDT } from "./0_initWallet.js"
 
-// USDT的合约地址
-const contractAddress = '0xdac17f958d2ee523a2206206994597c13d831ec7'
-// 构建USDT的Transfer的ABI
-const abi = [
-  "event Transfer(address indexed from, address indexed to, uint value)"
-];
 // 生成USDT合约对象
-const contractUSDT = new ethers.Contract(contractAddress, abi, provider);
-
+const contractUSDT = new ethers.Contract(contractAddressUSDT, [...eventTransferAbi], provider);
 
 const main = async () => {
   // 监听USDT合约的Transfer事件

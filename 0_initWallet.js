@@ -17,3 +17,10 @@ export const walletAlchemy = new ethers.Wallet(privateKey, providerAlchemy)
 
 export const walletMainNetByAlchemy = new ethers.Wallet(privateKey, providerSepolia)
 export const walletMainNetBySepolia = new ethers.Wallet(privateKey, providerEthBySepolia)
+
+export const eventTransferAbi= ["event Transfer(address indexed from, address indexed to, uint value)"]
+export const balanceOfAbi= ["function balanceOf(address) public view returns(uint)"]
+export const contractAddressUSDT = '0xdac17f958d2ee523a2206206994597c13d831ec7'
+
+// 币安交易所地址
+export const accountBinance = '0x28C6c06298d514Db089934071355E5743bf21d60'
