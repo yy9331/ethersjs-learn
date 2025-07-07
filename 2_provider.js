@@ -1,19 +1,15 @@
 import { ethers } from "ethers";
+import { providerEthByInfura as providerETH, providerSepoliaInfura } from './0_initProviderAndWallet.js';
 
 import dotenv from "dotenv";
 dotenv.config();
-
-// 连接以太坊主网
-const providerETH = new ethers.JsonRpcProvider(process.env.MAINNET_RPC_URL);
-// 连接Sepolia测试网
-const providerSepolia = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
 
 async function checkBalances() {
     // 1. 查询vitalik在主网和Sepolia测试网的ETH余额
     console.log("1. 查询vitalik在主网和Sepolia测试网的ETH余额");
     try {
         const balance = await providerETH.getBalance('vitalik.eth');
-        const balanceSepolia = await providerSepolia.getBalance('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045');
+        const balanceSepolia = await providerSepoliaInfura.getBalance('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045');
         // 将余额输出在console（主网）
         console.log(`ETH Balance of vitalik: ${ethers.formatEther(balance)} ETH`);
         // 输出Sepolia测试网ETH余额

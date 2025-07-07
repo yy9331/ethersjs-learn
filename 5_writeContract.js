@@ -1,15 +1,11 @@
 import { ethers } from "ethers";
+import { providerSepoliaAlchemy } from './0_initProviderAndWallet.js';
 
 import dotenv from "dotenv";
 dotenv.config();
 
-// 连接以太坊主网
-const providerETH = new ethers.JsonRpcProvider(process.env.MAINNET_RPC_URL);
-// 连接Sepolia测试网
-const providerSepolia = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
-
 const privateKey = process.env.WALLET_PRIVATE_KEY
-const wallet = new ethers.Wallet(privateKey, providerSepolia)
+const wallet = new ethers.Wallet(privateKey, providerSepoliaAlchemy)
 
 const abiWETH = [
     "function name() view returns (string)",
@@ -27,7 +23,7 @@ const addressWETH = '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9'
 // const contractWETH = new ethers.Contract(addressWETH, abiWETH, wallet)
 // 2. 声明可读合约, 可读合约不需要用 Gas, 再用connect(wallet)函数转换为可写合约
 //      可读合约第三个参数为 provider
-const contractWETH = new ethers.Contract(addressWETH, abiWETH, providerSepolia)
+const contractWETH = new ethers.Contract(addressWETH, abiWETH, providerSepoliaAlchemy)
 // 将合约连接到钱包以支持交易
 const contractWETHWithSigner = contractWETH.connect(wallet)
 
@@ -38,7 +34,7 @@ const main = async () => {
     const balanceWETH = await contractWETH.balanceOf(address)
     console.log(`存款前WETH持仓: ${ethers.formatEther(balanceWETH)}`)
     // 读取钱包内 ETH 余额
-    const balanceETH = await providerSepolia.getBalance(wallet)
+    const balanceETH = await providerSepoliaAlchemy.getBalance(wallet)
 
     if (ethers.formatEther(balanceETH) > 0.0015) {
         // 2. 调用deposit()函数，将0.001 ETH转为WETH

@@ -5,7 +5,7 @@
 // contractUSDT.once("事件名", Listener)
 
 import { ethers } from "ethers";
-import { providerEthByAlchemy as provider, eventTransferAbi, contractAddressUSDT } from "./0_initWallet.js"
+import { providerEthByAlchemy as provider, eventTransferAbi, contractAddressUSDT } from "./0_initProviderAndWallet.js"
 
 // 生成USDT合约对象
 const contractUSDT = new ethers.Contract(contractAddressUSDT, [...eventTransferAbi], provider);

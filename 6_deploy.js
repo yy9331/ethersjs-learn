@@ -1,7 +1,7 @@
 import { ethers } from "ethers"
 import bytecodeERC20 from "./6_byteCode.js"
 import abiERC20 from "./6_abi_human_readable.js"
-import { walletSepolia as wallet, providerSepolia as provider } from "./0_initWallet.js"
+import { walletSepoliaInfura as wallet, providerSepoliaAlchemy as provider } from "./0_initProviderAndWallet.js"
 
 const factoryERC20 = new ethers.ContractFactory(abiERC20, bytecodeERC20, wallet)
 
@@ -13,7 +13,7 @@ const main = async () => {
         console.log("\n1. 利用contractFactory部署ERC20代币合约")
 
         // 部署合约，填入constructor的参数
-        const contractERC20 = await factoryERC20.deploy('CM Token', 'CM')
+        const contractERC20 = await factoryERC20.deploy('CM2 Token', 'CM2')
         console.log(`合约地址: ${contractERC20.target}`);
         console.log("部署合约的交易详情")
         console.log(contractERC20.deploymentTransaction())

@@ -1,18 +1,17 @@
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
+import { providerSepoliaAlchemy } from './0_initProviderAndWallet.js'
 
 // 加载环境变量
 dotenv.config();
 
-const providerSepolia = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL)
-
 // 1. 创建随机wallet 对象
 const wallet1 = ethers.Wallet.createRandom()
-const walletWithProvider = wallet1.connect(providerSepolia)
+const walletWithProvider = wallet1.connect(providerSepoliaAlchemy)
 const mnemonic = wallet1.mnemonic // 生成助记词
 
 // 利用私钥和provider创建wallet对象
-const wallet2 = new ethers.Wallet(process.env.WALLET_PRIVATE_KEY, providerSepolia)
+const wallet2 = new ethers.Wallet(process.env.WALLET_PRIVATE_KEY, providerSepoliaAlchemy)
 
 // 从助记词创建wallet对象
 const wallet3 = ethers.Wallet.fromPhrase(mnemonic.phrase)
@@ -38,8 +37,8 @@ const initWallet = async () => {
 
     // 4. 获取链上发送交易次数
     console.log(`4. 获取链上交易次数`)
-    const exCount1 = await providerSepolia.getTransactionCount(walletWithProvider)
-    const exCount2 = await providerSepolia.getTransactionCount(wallet2)
+    const exCount1 = await providerSepoliaAlchemy.getTransactionCount(walletWithProvider)
+    const exCount2 = await providerSepoliaAlchemy.getTransactionCount(wallet2)
     console.log('钱包1交易次数', exCount1)
     console.log('钱包2交易次数', exCount2)
     
@@ -49,8 +48,8 @@ const initWallet = async () => {
     // 2. paradigm水龙头: https://faucet.paradigm.xyz/
     // i. 打印交易前余额
     console.log(`i. 发送前余额`)
-    console.log(`钱包1: ${ethers.formatEther(await providerSepolia.getBalance(walletWithProvider))} ETH`) // 钱包1: 0.0 ETH
-    console.log(`钱包2: ${ethers.formatEther(await providerSepolia.getBalance(wallet2))} ETH`) // 钱包2: 0.257334298217011922 ETH
+    console.log(`钱包1: ${ethers.formatEther(await providerSepoliaAlchemy.getBalance(walletWithProvider))} ETH`) // 钱包1: 0.0 ETH
+    console.log(`钱包2: ${ethers.formatEther(await providerSepoliaAlchemy.getBalance(wallet2))} ETH`) // 钱包2: 0.257334298217011922 ETH
 
     // ii. 构造交易请求，参数：to为接收地址，value为ETH数额
     const ex = {
@@ -87,8 +86,8 @@ const initWallet = async () => {
     //   }
     // iv. 打印交易后余额
     console.log(`\niii. 发送后余额`)
-    console.log(`钱包1: ${ethers.formatEther(await providerSepolia.getBalance(walletWithProvider))} ETH`) // 钱包1: 0.001 ETH
-    console.log(`钱包2: ${ethers.formatEther(await providerSepolia.getBalance(wallet2))} ETH`) // 钱包2: 0.256250020962306922 ETH
+    console.log(`钱包1: ${ethers.formatEther(await providerSepoliaAlchemy.getBalance(walletWithProvider))} ETH`) // 钱包1: 0.001 ETH
+    console.log(`钱包2: ${ethers.formatEther(await providerSepoliaAlchemy.getBalance(wallet2))} ETH`) // 钱包2: 0.256250020962306922 ETH
 
 }
 
