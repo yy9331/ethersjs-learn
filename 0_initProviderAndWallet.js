@@ -22,6 +22,9 @@ export const walletSepoliaAlchemy = new ethers.Wallet(privateKey, providerSepoli
 // abi
 export const eventTransferAbi= ["event Transfer(address indexed from, address indexed to, uint value)"]
 export const balanceOfAbi= ["function balanceOf(address) public view returns(uint)"]
+export const nameFunctionAbi= ["function name() view returns (string)"]
+export const symbolFuncstionAbi = ["function symbol() view returns (string)",]
+export const supportsInterfaceFunctionAbi = ["function supportsInterface(bytes4) public view returns(bool)"]
 
 // 某个USDT 合约地址
 export const contractAddressUSDT = '0xdac17f958d2ee523a2206206994597c13d831ec7'
