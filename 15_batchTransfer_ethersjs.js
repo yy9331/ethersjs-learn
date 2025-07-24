@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { providerSepoliaAlchemy as provider, walletSepoliaAlchemy as wallet } from "./0_init.js";
+import { providerSepoliaAlchemy as provider, walletSepoliaAlchemy as wallet } from "./0_init_ethersjs.js";
 
 // 1. 创建HD钱包
 console.log("1. 创建HD钱包")

@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
 import { MerkleTree } from "merkletreejs";
-import { providerSepoliaInfura as provider, walletSepoliaInfura as wallet } from "./0_init.js";
+import { providerSepoliaInfura as provider, walletSepoliaInfura as wallet } from "./0_init_ethersjs.js";
 import contractJson from './17_contract.json' assert { type: 'json' };
 
 console.log("=== 默克尔树NFT铸造系统 ===");

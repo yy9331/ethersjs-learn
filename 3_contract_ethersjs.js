@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { providerEthByAlchemy as providerETH } from './0_init.js';
+import { providerEthByAlchemy as providerETH } from './0_init_ethersjs.js';
 
 import dotenv from "dotenv";
 dotenv.config();

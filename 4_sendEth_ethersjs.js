@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
-import { providerSepoliaAlchemy } from './0_init.js'
+import { providerSepoliaAlchemy } from './0_init_ethersjs.js'
 
 // 加载环境变量
 dotenv.config();

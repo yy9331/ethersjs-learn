@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { providerEthByInfura as providerETH, providerSepoliaInfura } from './0_init.js';
+import { providerEthByInfura as providerETH, providerSepoliaInfura } from './0_init_ethersjs.js';
 
 import dotenv from "dotenv";
 dotenv.config();

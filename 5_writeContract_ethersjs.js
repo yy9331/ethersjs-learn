@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { providerSepoliaAlchemy } from './0_init.js';
+import { providerSepoliaAlchemy } from './0_init_ethersjs.js';
 
 import dotenv from "dotenv";
 dotenv.config();

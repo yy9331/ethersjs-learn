@@ -1,6 +1,6 @@
 // contract.函数名.staticCall(参数, {override})
 import { ethers } from "ethers";
-import { providerEthByAlchemy as provider, walletMainNetByAlchemy as wallet } from './0_init.js';
+import { providerEthByAlchemy as provider, walletMainNetByAlchemy as wallet } from './0_init_ethersjs.js';
 
 // DAI的ABI
 const abiDAI = [

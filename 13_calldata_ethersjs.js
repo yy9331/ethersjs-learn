@@ -5,7 +5,7 @@ import {
     balanceOfAbi,
     depositFunctionAbi,
     wethSepolia as addressWETH
-} from './0_init.js'
+} from './0_init_ethersjs.js'
 
 const contractWETH = new ethers.Contract(addressWETH, [...balanceOfAbi, ...depositFunctionAbi], wallet);
 

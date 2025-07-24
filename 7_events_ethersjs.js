@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { providerETHBySepolia as provider } from "./0_init.js"
+import { providerETHBySepolia as provider } from "./0_init_ethersjs.js"
 
 // WETH ABI，只包含我们关心的Transfer事件
 const abiWETH = [

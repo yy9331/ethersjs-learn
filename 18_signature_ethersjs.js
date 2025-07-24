@@ -1,5 +1,5 @@
 import {ethers} from 'ethers'
-import { providerSepoliaInfura as provider, walletSepoliaInfura as wallet } from './0_init.js'
+import { providerSepoliaInfura as provider, walletSepoliaInfura as wallet } from './0_init_ethersjs.js'
 
 const main = async () => {
     try {
