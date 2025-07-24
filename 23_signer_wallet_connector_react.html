@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>MetaMask Connect React Demo</title>
+    <!-- React & ReactDOM CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX support -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Ethers.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.2.3/ethers.umd.min.js"></script>
+    <style>
+      body { background: #f8fafc; font-family: Inter, Arial, sans-serif; }
+      #root { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+      .card {
+        background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        padding: 2.5rem 2rem; min-width: 340px; max-width: 90vw; text-align: center;
+      }
+      .btn {
+        background: #6366f1; color: #fff; border: none; border-radius: 8px;
+        padding: 0.75rem 2.5rem; font-size: 1.1rem; font-weight: 600;
+        cursor: pointer; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(99,102,241,0.08)
+      }
+      .btn:disabled {
+        background: #9ca3af; cursor: not-allowed; box-shadow: none;
+      }
+      .info { margin-bottom: 0.7rem; color: #374151; }
+      .error { color: #dc2626; margin-bottom: 1rem; }
+      .protocol-warning {
+        background: #fef3c7; border: 1px solid #f59e0b; color: #92400e;
+        padding: 15px; border-radius: 8px; margin-bottom: 1.5rem;
+        text-align: left;
+      }
+      .protocol-warning ul {
+        margin: 10px 0 0 0; padding-left: 20px;
+      }
+      .protocol-warning li {
+        margin: 5px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+      const { ethers } = window.ethers;
+
+      const MetaMaskConnect = () => {
+        const [account, setAccount] = useState('');
+        const [chainId, setChainId] = useState('');
+        const [ethBalance, setEthBalance] = useState('');
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState('');
+        const [isFileProtocol, setIsFileProtocol] = useState(false);
+        const [isConnected, setIsConnected] = useState(false);
+
+        // 检测协议
+        useEffect(() => {
+          if (window.location.protocol === 'file:') {
+            setIsFileProtocol(true);
+          }
+        }, []);
+
+        const connectWallet = async () => {
+          setError('');
+          setLoading(true);
+          
+          try {
+            // 检查是否在正确的协议下
+            if (window.location.protocol === 'file:') {
+              setError('请在 Live Server 或 其他服务器 环境下运行此页面');
+              setLoading(false);
+              return;
+            }
+
+            if (!window.ethereum) {
+              setError('请先安装MetaMask插件！');
+              setLoading(false);
+              return;
+            }
+            
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            console.log("开始连接钱包...");
+            const accounts = await provider.send('eth_requestAccounts', []);
+            console.log("获取到的账户:", accounts);
+            const account = accounts[0];
+            setAccount(account);
+            
+            // 读取chainid
+            const { chainId } = await provider.getNetwork();
+            setChainId(chainId.toString());
+            
+            // 读取ETH余额
+            const signer = await provider.getSigner();
+            const balance = await provider.getBalance(signer.getAddress());
+            setEthBalance(ethers.formatUnits(balance));
+            setIsConnected(true);
+          } catch (err) {
+            setError('连接失败: ' + (err.message || err));
+          }
+          setLoading(false);
+        };
+
+        const disconnectWallet = async () => {
+          setError('');
+          setLoading(true);
+          
+          try {
+            // 清空所有状态
+            setAccount('');
+            setChainId('');
+            setEthBalance('');
+            setIsConnected(false);
+            
+            // 尝试断开连接（如果钱包支持）
+            if (window.ethereum && window.ethereum.removeAllListeners) {
+              window.ethereum.removeAllListeners();
+            }
+            
+            console.log('钱包已断开连接');
+          } catch (err) {
+            setError('断开连接失败: ' + (err.message || err));
+          }
+          setLoading(false);
+        };
+
+        return (
+          <div className="card">
+            <h1 style={{ marginBottom: "1.5rem", color: "#1a202c" }}>
+              连接 MetaMask 钱包
+            </h1>
+            
+            {/* 协议检测警告 */}
+            {isFileProtocol && (
+              <div className="protocol-warning">
+                <strong>⚠️ 重要提示：</strong><br />
+                检测到您正在使用 file:// 协议访问此页面。<br />
+                MetaMask 出于安全考虑，不允许在本地文件环境下工作。<br />
+                <strong>解决方案：</strong>
+                <ul>
+                  <li>使用 Live Server 或其他本地服务器</li>
+                  <li>或者将文件部署到网络服务器上</li>
+                </ul>
+              </div>
+            )}
+            
+            <button
+              className="btn"
+              onClick={isConnected ? disconnectWallet : connectWallet}
+              disabled={loading || isFileProtocol}
+              style={{ 
+                cursor: loading || isFileProtocol ? "not-allowed" : "pointer",
+                background: isConnected ? "#dc2626" : "#6366f1"
+              }}
+            >
+              {loading 
+                ? (isConnected ? "断开中..." : "连接中...") 
+                : isFileProtocol 
+                  ? "请使用 Live Server" 
+                  : isConnected 
+                    ? "断开连接" 
+                    : "连接钱包"
+              }
+            </button>
+            
+            {error && <div className="error">{error}</div>}
+            
+            <div className="info">
+              <strong>钱包地址：</strong>{account || "--"}
+            </div>
+            <div className="info">
+              <strong>Chain ID：</strong>{chainId || "--"}
+            </div>
+            <div className="info">
+              <strong>ETH余额：</strong>{ethBalance || "--"}
+            </div>
+            
+            <div style={{ marginTop: "2rem", color: "#64748b", fontSize: "0.95rem" }}>
+              <span>
+                如未安装MetaMask，请先前往{" "}
+                <a href="https://metamask.io/" target="_blank" rel="noopener noreferrer">
+                  MetaMask官网
+                </a>
+                {" "}安装。
+              </span>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<MetaMaskConnect />);
+    </script>
+  </body>
+</html>

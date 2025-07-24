@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body>
+    <h1 id="header">Connect to Metamask</h1>
+    <button class="connect"> Connect</button>
+    <button class="disconnect"> Disconnect</button>
+    <h2>钱包地址: <span class="showAccount"></span></h2>
+    <h2>ChainID: <span class="showChainID"></span></h2>
+    <h2>ETH 余额: <span class="showETHBalance"></span></h2>
+
+    <script type="module">
+      import { ethers } from "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.2.3/ethers.js";      const ethereumButton = document.querySelector('.connect');
+      const disconnectButton = document.querySelector('.disconnect');
+      const showAccount = document.querySelector('.showAccount');
+      const showChainID = document.querySelector('.showChainID');
+      const showETHBalance = document.querySelector('.showETHBalance');
+
+      ethereumButton.addEventListener(`click`, onClickHandler)
+      disconnectButton.addEventListener(`click`, onDisconnectHandler)
+      
+      async function onClickHandler() {
+          console.log("连接钱包")
+          // 获得provider
+          const provider = new ethers.BrowserProvider(window.ethereum)
+          // 读取钱包地址
+          const accounts = await provider.send("eth_requestAccounts", []);
+          const account = accounts[0]
+          console.log(`钱包地址: ${account}`)
+          showAccount.innerHTML = account;
+          // 读取chainid
+          const { chainId } = await provider.getNetwork()
+          console.log(`chainid: ${chainId}`)
+          showChainID.innerHTML = chainId;
+          
+          // 两种连接方法: 读取ETH余额
+          // 1. provider 连接 : 读取ETH余额
+          const balance = await provider.getBalance(account);
+
+          // 2.singer 连接: 读取ETH余额
+          // const signer = await provider.getSigner()
+          // const balance = await provider.getBalance(signer.getAddress());
+          
+          console.log(`以太坊余额： ${ethers.formatUnits(balance)}`)
+          showETHBalance.innerHTML = ethers.formatUnits(balance);
+        }
+
+      async function onDisconnectHandler() {
+          console.log("断开钱包连接")
+          // 清空显示的信息
+          showAccount.innerHTML = "未连接";
+          showChainID.innerHTML = "未连接";
+          showETHBalance.innerHTML = "未连接";
+          
+          // 尝试断开连接（如果钱包支持）
+          if (window.ethereum && window.ethereum.removeAllListeners) {
+              window.ethereum.removeAllListeners();
+          }
+          
+          console.log("钱包已断开连接")
+      }
+    </script>  
+  </body>
+</html>
