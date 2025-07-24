@@ -1,7 +1,7 @@
 import { ethers } from "ethers"
 import bytecodeERC20 from "./6_byteCode.js"
 import abiERC20 from "./6_abi_human_readable.js"
-import { walletSepoliaInfura as wallet, providerSepoliaAlchemy as provider } from "./0_initProviderAndWallet.js"
+import { walletSepoliaInfura as wallet, providerSepoliaAlchemy as provider } from "./0_init.js"
 
 const factoryERC20 = new ethers.ContractFactory(abiERC20, bytecodeERC20, wallet)
 

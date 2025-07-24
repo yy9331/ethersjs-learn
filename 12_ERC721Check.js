@@ -3,7 +3,7 @@ import { nameFunctionAbi,
     symbolFuncstionAbi,
     supportsInterfaceFunctionAbi,
     providerEthByAlchemy as provider
- } from './0_initProviderAndWallet.js'
+ } from './0_init.js'
 
 // ERC721的合约地址，这里用的BAYC
 const addressBAYC = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"

@@ -1,7 +1,7 @@
 import fs from "fs";
 
 // 读取 JSON ABI 文件
-const jsonAbi = JSON.parse(fs.readFileSync('./6_abi.json', 'utf8'));
+const jsonAbi = JSON.parse(fs.readFileSync('./abi_source.json', 'utf8'));
 
 // 将 JSON ABI 转换为人类可读格式
 function convertToHumanReadable(abi) {

@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { providerEthByAlchemy as provider, eventTransferAbi, balanceOfAbi, contractAddressUSDT, accountBinance } from "./0_initProviderAndWallet.js"
+import { providerEthByAlchemy as provider, eventTransferAbi, balanceOfAbi, contractAddressUSDT, accountBinance } from "./0_init.js"
 
 // 构建合约对象
 const contractUSDT = new ethers.Contract(contractAddressUSDT, [...eventTransferAbi, ...balanceOfAbi], provider);
