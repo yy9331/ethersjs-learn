@@ -375,6 +375,31 @@ await publicClient.waitForTransactionReceipt({ hash: hash2 });
 - **ABI 支持**：ethers.js 支持人类可读 ABI，viem 需完整 ABI 对象。
 - **关键步骤打印**：viem 版本同样建议在每一步加详细 console.log，便于调试和学习。
 
+### **5. 部署合约对比**
+
+#### **Ethers.js 版本**
+```javascript
+const factoryERC20 = new ethers.ContractFactory(abiERC20, bytecodeERC20, wallet);
+const contractERC20 = await factoryERC20.deploy('CM2 Token', 'CM2');
+await contractERC20.waitForDeployment();
+```
+
+#### **Viem 版本**
+```javascript
+const hash = await walletClient.deployContract({
+  abi: abiERC20,
+  bytecode: bytecodeERC20,
+  args: ['CM2 Token', 'CM2']
+});
+await publicClient.waitForTransactionReceipt({ hash });
+```
+
+#### **主要区别说明**
+- **部署方式**：ethers.js 用 `ContractFactory.deploy`，viem 用 `walletClient.deployContract`。
+- **参数传递**：两者都支持构造参数，viem 需显式传递 `args`。
+- **合约交互**：ethers.js 直接用合约实例，viem 需每次传递合约地址和 ABI。
+- **关键步骤打印**：viem 版本同样建议在每一步加详细 console.log，便于调试和学习。
+
 ## 📈 性能测试结果
 
 ### **RPC 配置测试**
