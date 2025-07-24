@@ -307,6 +307,35 @@ const abiERC20 = [
 ];
 ```
 
+### **3. 发送 ETH 对比**
+
+#### **Ethers.js 版本**
+```javascript
+import { ethers } from 'ethers';
+const wallet2 = new ethers.Wallet(process.env.WALLET_PRIVATE_KEY, providerSepoliaAlchemy);
+const ex = { to: address1, value: ethers.parseEther("0.001") };
+const receipt = await wallet2.sendTransaction(ex);
+await receipt.wait();
+```
+
+#### **Viem 版本**
+```javascript
+import { createWalletClient, createPublicClient, http, parseEther } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+const account2 = privateKeyToAccount(process.env.WALLET_PRIVATE_KEY);
+const walletClient = createWalletClient({ account: account2, chain: sepolia, transport: http() });
+const tx = { to: address1, value: parseEther("0.001") };
+const hash = await walletClient.sendTransaction(tx);
+const receipt = await publicClient.waitForTransactionReceipt({ hash });
+```
+
+#### **主要区别说明**
+- **钱包创建**：ethers.js 支持助记词和私钥，viem 目前仅支持私钥（助记词需第三方库）。
+- **API 风格**：ethers.js 用 Wallet 实例，viem 用 account + client 分离。
+- **交易发送**：ethers.js 直接 `wallet.sendTransaction`，viem 需先用 `walletClient.sendTransaction` 获取 hash，再用 `publicClient.waitForTransactionReceipt` 等待确认。
+- **单位处理**：ethers.js 用 `ethers.parseEther`，viem 用 `parseEther`。
+- **余额查询**：ethers.js 用 `provider.getBalance(wallet)`，viem 用 `publicClient.getBalance({ address })`。
+
 ## 📈 性能测试结果
 
 ### **RPC 配置测试**
