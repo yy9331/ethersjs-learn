@@ -9,6 +9,7 @@
   "dependencies": {
     "dotenv": "^17.0.1",
     "ethers": "^6.15.0",
-    "merkletreejs": "^0.5.2"
+    "merkletreejs": "^0.5.2",
+    "viem": "^2.33.0"
   }
 }
