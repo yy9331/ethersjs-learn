@@ -336,6 +336,45 @@ const receipt = await publicClient.waitForTransactionReceipt({ hash });
 - **单位处理**：ethers.js 用 `ethers.parseEther`，viem 用 `parseEther`。
 - **余额查询**：ethers.js 用 `provider.getBalance(wallet)`，viem 用 `publicClient.getBalance({ address })`。
 
+### **4. 合约写操作（存入WETH并转账）对比**
+
+#### **Ethers.js 版本**
+```javascript
+const contractWETH = new ethers.Contract(addressWETH, abiWETH, providerSepoliaAlchemy);
+const contractWETHWithSigner = contractWETH.connect(wallet);
+const tx = await contractWETHWithSigner.deposit({value: ethers.parseEther("0.001")});
+await tx.wait();
+const tx2 = await contractWETHWithSigner.transfer("vitalik.eth", ethers.parseEther("0.001"));
+await tx2.wait();
+```
+
+#### **Viem 版本**
+```javascript
+const hash = await walletClient.writeContract({
+  address: addressWETH,
+  abi: abiWETH,
+  functionName: "deposit",
+  value: parseEther("0.001")
+});
+await publicClient.waitForTransactionReceipt({ hash });
+
+const hash2 = await walletClient.writeContract({
+  address: addressWETH,
+  abi: abiWETH,
+  functionName: "transfer",
+  args: [vitalik, parseEther("0.001")]
+});
+await publicClient.waitForTransactionReceipt({ hash: hash2 });
+```
+
+#### **主要区别说明**
+- **合约实例**：ethers.js 需要实例化合约，viem 直接用 `writeContract`/`readContract`。
+- **写操作**：ethers.js 用 `connect(wallet)` 绑定签名者，viem 用 `walletClient` 直接发起写操作。
+- **ENS 支持**：ethers.js 支持直接用 ENS 地址，viem 需先解析 ENS 得到地址。
+- **交易确认**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
+- **ABI 支持**：ethers.js 支持人类可读 ABI，viem 需完整 ABI 对象。
+- **关键步骤打印**：viem 版本同样建议在每一步加详细 console.log，便于调试和学习。
+
 ## 📈 性能测试结果
 
 ### **RPC 配置测试**
