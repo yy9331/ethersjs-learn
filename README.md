@@ -569,7 +569,7 @@ const main = async () => {
         const blockNumber = await publicClient.getBlockNumber();
         console.log("当前区块高度:", blockNumber);
         
-        // 由于免费 RPC 不支持 WebSocket，使用轮询方式模拟实时监听
+        // 由于 viem 的 WebSocket 支持有限，使用轮询方式模拟实时监听
         console.log("1. 使用轮询方式模拟实时监听 Transfer 事件");
         
         let lastProcessedBlock = Number(blockNumber);
@@ -645,120 +645,42 @@ main();
 ```
 
 #### **主要区别说明**
-- **实时监听**：ethers.js 支持真正的实时 WebSocket 监听，viem 需要轮询模拟。
+- **实时监听**：ethers.js 支持真正的实时监听，viem 需要轮询模拟。
 - **事件处理**：ethers.js 自动解析事件参数，viem 需要手动解析 `topics` 和 `data`。
 - **连接方式**：ethers.js 用 `contract.on()` 和 `contract.once()`，viem 用 `setInterval` + `getLogs()`。
 - **错误处理**：ethers.js 内置错误处理，viem 需要手动处理轮询错误。
-- **RPC 限制**：ethers.js 支持 WebSocket，viem 免费 RPC 通常只支持 HTTP。
+- **RPC 支持**：ethers.js 支持 HTTP 和 WebSocket，viem 主要支持 HTTP。
 - **类型安全**：viem 需要明确的 BigInt 类型转换，ethers.js 自动处理。
 
-### **Viem 的 `watchContractEvent` API 详解**
+### **Viem 事件监听限制说明**
 
-#### **基本用法**
-```javascript
-import { createPublicClient, webSocket, watchContractEvent } from "viem";
+#### **Viem 的 WebSocket 限制**
 
-const publicClient = createPublicClient({
-    chain: mainnet,
-    transport: webSocket('wss://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY')
-});
+Viem 的 `watchContractEvent` API 需要 WebSocket RPC 支持，但存在以下限制：
 
-// 持续监听
-const unwatch = watchContractEvent(publicClient, {
-    address: contractAddress,
-    eventName: 'Transfer',
-    onLogs: (logs) => {
-        console.log('监听到事件:', logs);
-    },
-    onError: (error) => {
-        console.error('监听错误:', error);
-    }
-});
+1. **免费 RPC 不支持**：大多数免费 RPC 服务只提供 HTTP 接口
+2. **需要付费服务**：WebSocket 支持通常需要 Alchemy、Infura 等付费服务
+3. **连接不稳定**：免费 WebSocket 服务经常断连
+4. **配置复杂**：需要正确的 API Key 和 WebSocket URL
 
-// 停止监听
-unwatch();
-```
+#### **推荐方案**
 
-#### **监听一次事件**
-```javascript
-// 监听一次事件
-const unwatch = watchContractEvent(publicClient, {
-    address: contractAddress,
-    eventName: 'Transfer',
-    onLogs: (logs) => {
-        console.log('监听到一次事件:', logs);
-        // 处理完一次后停止监听
-        unwatch();
-    }
-});
-```
+**开发环境：**
+- 使用轮询方案（`9_events_filter_viem.js`）
+- 免费 RPC 即可满足需求
+- 简单可靠，易于调试
 
-#### **与 Ethers.js 的详细对比**
+**生产环境：**
+- 使用 ethers.js 的 HTTP 监听方案
+- 或者使用付费 WebSocket 服务
+- 或者继续使用轮询方案
 
-| 特性 | Ethers.js | Viem |
-|------|-----------|------|
-| **实时监听** | `contract.on()` | `watchContractEvent()` |
-| **监听一次** | `contract.once()` | `watchContractEvent()` + 手动停止 |
-| **RPC 要求** | 支持 HTTP 和 WebSocket | 仅支持 WebSocket |
-| **免费 RPC** | ✅ 支持 | ❌ 通常不支持 |
-| **事件解析** | 自动解析参数 | 需要手动解析 |
-| **错误处理** | 内置处理 | 需要 `onError` 回调 |
-| **停止监听** | `contract.removeAllListeners()` | 返回的 `unwatch()` 函数 |
+#### **为什么选择轮询方案**
 
-#### **RPC 支持对比**
-
-**Ethers.js 方式（更灵活）：**
-```javascript
-// 支持 HTTP RPC，免费服务可用
-const provider = new ethers.JsonRpcProvider("https://eth.merkle.io");
-const contract = new ethers.Contract(address, abi, provider);
-
-// 持续监听
-contract.on('Transfer', (from, to, value) => {
-    console.log(`${from} -> ${to} ${value}`);
-});
-
-// 监听一次
-contract.once('Transfer', (from, to, value) => {
-    console.log(`监听到一次: ${from} -> ${to} ${value}`);
-});
-```
-
-**Viem 方式（需要 WebSocket）：**
-```javascript
-// 需要 WebSocket RPC，通常需要付费
-const publicClient = createPublicClient({
-    chain: mainnet,
-    transport: webSocket('wss://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY')
-});
-
-// 持续监听
-const unwatch = watchContractEvent(publicClient, {
-    address: contractAddress,
-    eventName: 'Transfer',
-    onLogs: (logs) => {
-        logs.forEach(log => {
-            const from = '0x' + log.topics[1].slice(26);
-            const to = '0x' + log.topics[2].slice(26);
-            const value = formatUnits(log.data, 6);
-            console.log(`${from} -> ${to} ${value} USDT`);
-        });
-    }
-});
-```
-
-#### **为什么使用轮询方案**
-
-1. **免费 RPC 限制**：大多数免费 RPC 只支持 HTTP，不支持 WebSocket
-2. **成本考虑**：WebSocket 服务通常需要付费（Alchemy、Infura 等）
-3. **学习目的**：轮询方案更容易理解和调试
-4. **兼容性**：轮询方案在所有 RPC 环境下都能工作
-
-#### **生产环境建议**
-
-- **使用付费 WebSocket RPC 服务**：Alchemy、Infura 等
-- **或者继续使用轮询方案**：适合对实时性要求不高的场景
-- **或者考虑使用 ethers.js 的 HTTP 监听**：在免费环境下更实用
+1. **免费 RPC 支持**：所有免费 RPC 都支持 HTTP
+2. **简单可靠**：无需复杂的 WebSocket 配置
+3. **易于调试**：可以清楚地看到每个请求和响应
+4. **兼容性好**：在所有环境下都能工作
 
 ## 📈 性能测试结果
 
