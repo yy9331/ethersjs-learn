@@ -37,6 +37,7 @@ etherjs-viem-learn/
 ├── 12_ERC721Check_ethersjs.js                  # ERC721 检查
 ├── 12_ERC721Check_viem.js                      # ERC721 检查 (viem)
 ├── 13_calldata_ethersjs.js                     # Calldata 处理
+├── 13_calldata_viem.js                         # Calldata 处理 (viem)
 ├── 14_HDWallet_ethersjs.js                     # HD 钱包
 ├── 15_batchTransfer_ethersjs.js                # 批量转账
 ├── 16_batchCollect_ethersjs.js                 # 批量收集
@@ -407,85 +408,35 @@ await publicClient.waitForTransactionReceipt({ hash: hash2 });
 
 #### **Ethers.js 版本**
 ```javascript
-import { ethers } from "ethers";
-import { providerEthByAlchemy as provider, walletMainNetByAlchemy as wallet } from './0_init_ethersjs.js';
-
-const addressDAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
-const contractDAI = new ethers.Contract(addressDAI, [
-    "function balanceOf(address owner) view returns (uint256)",
-    "function transfer(address to, uint256 amount) returns (bool)"
-], provider);
-
-const main = async () => {
-    const address = await wallet.getAddress();
-    const vitalikAddress = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    
-    // 1. 读取余额
-    const balanceDAI = await contractDAI.balanceOf(address);
-    console.log(`测试钱包 DAI持仓: ${ethers.formatEther(balanceDAI)}`);
-    
-    // 2. staticCall 模拟转账（不会真正执行）
-    try {
-        await contractDAI.transfer.staticCall(
-            address, // 转账给测试钱包
-            ethers.parseEther("1"),
-            {from: vitalikAddress} // Vitalik作为发送方
-        );
-        console.log("交易会成功吗？：成功");
-    } catch (error) {
-        console.log(`交易失败：${error.reason}`);
-    }
-};
-
-main();
+// staticCall 模拟转账（不会真正执行）
+try {
+    await contractDAI.transfer.staticCall(
+        address, // 转账给测试钱包
+        ethers.parseEther("1"),
+        {from: vitalikAddress} // Vitalik作为发送方
+    );
+    console.log("交易会成功吗？：成功");
+} catch (error) {
+    console.log(`交易失败：${error.reason}`);
+}
 ```
 
 #### **Viem 版本**
 ```javascript
-import { createPublicClient, http, formatEther, parseEther, parseAbiItem } from "viem";
-import { mainnet } from "viem/chains";
-import { walletMainNetByAlchemy as wallet } from './0_init_ethersjs.js';
-import dotenv from "dotenv";
-dotenv.config();
-
-const publicClient = createPublicClient({
-    chain: mainnet,
-    transport: http(process.env.MAINNET_RPC_URL_ALCHEMY)
-});
-
-const addressDAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
-
-const main = async () => {
-    const address = await wallet.getAddress();
-    const vitalikAddress = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
-    
-    // 1. 读取余额
-    const balanceOfAbi = parseAbiItem("function balanceOf(address owner) view returns (uint256)");
-    const balanceDAI = await publicClient.readContract({
+// simulateContract 模拟转账（不会真正执行）
+try {
+    const transferAbi = parseAbiItem("function transfer(address to, uint256 amount) returns (bool)");
+    await publicClient.simulateContract({
         address: addressDAI,
-        abi: [balanceOfAbi],
-        functionName: 'balanceOf',
-        args: [address]
+        abi: [transferAbi],
+        functionName: 'transfer',
+        args: [address, parseEther("1")],
+        account: vitalikAddress // Vitalik作为发送方
     });
-    console.log(`测试钱包 DAI持仓: ${formatEther(balanceDAI)}`);
-    
-    // 2. simulateContract 模拟转账（不会真正执行）
-    try {
-        const transferAbi = parseAbiItem("function transfer(address to, uint256 amount) returns (bool)");
-        await publicClient.simulateContract({
-            address: addressDAI,
-            abi: [transferAbi],
-            functionName: 'transfer',
-            args: [address, parseEther("1")],
-            account: vitalikAddress // Vitalik作为发送方
-        });
-        console.log("交易会成功吗？：成功");
-    } catch (error) {
-        console.log(`交易失败：${error.message}`);
-    }
-};
-
-main();
+    console.log("交易会成功吗？：成功");
+} catch (error) {
+    console.log(`交易失败：${error.message}`);
+}
 ```
 
 #### **主要区别说明**
@@ -508,107 +459,24 @@ main();
 
 #### **Ethers.js 版本**
 ```javascript
-import { ethers } from "ethers";
-import { nameFunctionAbi, symbolFuncstionAbi, supportsInterfaceFunctionAbi, providerEthByAlchemy as provider } from './0_init_ethersjs.js';
-
-const addressBAYC = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d";
-const contractERC721 = new ethers.Contract(addressBAYC, [
-    ...nameFunctionAbi, 
-    ...symbolFuncstionAbi, 
-    ...supportsInterfaceFunctionAbi
-], provider);
-
-const selectorERC721 = "0x80ac58cd"; // ERC721 interface identifier
-
-const main = async () => {
-    try {
-        // 1. 读取合约基本信息
-        const nameERC721 = await contractERC721.name();
-        const symbolERC721 = await contractERC721.symbol();
-        console.log(`名称: ${nameERC721}`);
-        console.log(`代号: ${symbolERC721}`);
-        
-        // 2. 检查是否为ERC721标准
-        const isERC721 = await contractERC721.supportsInterface(selectorERC721);
-        console.log(`合约是否为ERC721标准: ${isERC721}`);
-    } catch (e) {
-        console.log(e);
-    }
-};
-
-main();
+// 检查是否为ERC721标准
+const isERC721 = await contractERC721.supportsInterface(selectorERC721);
+console.log(`合约是否为ERC721标准: ${isERC721}`);
 ```
 
 #### **Viem 版本**
 ```javascript
-import { createPublicClient, http, parseAbiItem } from "viem";
-import { mainnet } from "viem/chains";
-import dotenv from "dotenv";
-dotenv.config();
+// 使用 parseAbiItem 解析 ABI
+const supportsInterfaceAbi = parseAbiItem("function supportsInterface(bytes4 interfaceId) view returns (bool)");
 
-const publicClient = createPublicClient({
-    chain: mainnet,
-    transport: http(process.env.MAINNET_RPC_URL_ALCHEMY)
+// 检查是否为ERC721标准
+const isERC721 = await publicClient.readContract({
+    address: addressBAYC,
+    abi: [supportsInterfaceAbi],
+    functionName: 'supportsInterface',
+    args: [selectorERC721]
 });
-
-const addressBAYC = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d";
-const selectorERC721 = "0x80ac58cd";
-
-const main = async () => {
-    try {
-        // 使用 parseAbiItem 解析 ABI
-        const nameAbi = parseAbiItem("function name() view returns (string)");
-        const symbolAbi = parseAbiItem("function symbol() view returns (string)");
-        const supportsInterfaceAbi = parseAbiItem("function supportsInterface(bytes4 interfaceId) view returns (bool)");
-        
-        // 1. 读取合约基本信息
-        const nameERC721 = await publicClient.readContract({
-            address: addressBAYC,
-            abi: [nameAbi],
-            functionName: 'name'
-        });
-        
-        const symbolERC721 = await publicClient.readContract({
-            address: addressBAYC,
-            abi: [symbolAbi],
-            functionName: 'symbol'
-        });
-        
-        console.log(`名称: ${nameERC721}`);
-        console.log(`代号: ${symbolERC721}`);
-        
-        // 2. 检查是否为ERC721标准
-        const isERC721 = await publicClient.readContract({
-            address: addressBAYC,
-            abi: [supportsInterfaceAbi],
-            functionName: 'supportsInterface',
-            args: [selectorERC721]
-        });
-        
-        console.log(`合约是否为ERC721标准: ${isERC721}`);
-        
-        // 3. 额外检查其他接口支持情况
-        const selectorERC1155 = "0xd9b67a26";
-        const selectorERC165 = "0x01ffc9a7";
-        const selectorERC2981 = "0x2a55205a";
-        
-        const isERC1155 = await publicClient.readContract({
-            address: addressBAYC,
-            abi: [supportsInterfaceAbi],
-            functionName: 'supportsInterface',
-            args: [selectorERC1155]
-        });
-        
-        console.log(`是否为ERC1155标准: ${isERC1155}`);
-        console.log(`是否为ERC165标准: ${isERC165}`);
-        console.log(`是否支持ERC2981版税: ${isERC2981}`);
-        
-    } catch (e) {
-        console.log("检查失败:", e.message);
-    }
-};
-
-main();
+console.log(`合约是否为ERC721标准: ${isERC721}`);
 ```
 
 #### **主要区别说明**
@@ -626,7 +494,72 @@ main();
 - **安全验证**：避免与不符合标准的合约交互，减少错误和风险。
 - **市场应用**：NFT 市场、钱包等应用需要准确识别合约类型来提供相应功能。
 
-### **7. 合约部署对比**
+### **7. Calldata 处理对比**
+
+#### **Ethers.js 版本**
+```javascript
+// 编码 calldata
+const param1 = contractWETH.interface.encodeFunctionData("balanceOf", [address]);
+
+// 创建交易并调用
+const tx1 = { to: addressWETH, data: param1 };
+const balanceWETH = await provider.call(tx1);
+
+// 编码 deposit 函数
+const param2 = contractWETH.interface.encodeFunctionData("deposit");
+const tx2 = { to: addressWETH, data: param2, value: ethers.parseEther("0.001") };
+const receipt1 = await wallet.sendTransaction(tx2);
+await receipt1.wait();
+```
+
+#### **Viem 版本**
+```javascript
+// 使用 parseAbiItem 解析 ABI
+const balanceOfAbi = parseAbiItem("function balanceOf(address) public view returns(uint)");
+const depositAbi = parseAbiItem("function deposit() payable");
+
+// 编码 calldata
+const param1 = encodeFunctionData({
+    abi: [balanceOfAbi],
+    functionName: "balanceOf",
+    args: [address]
+});
+
+// 直接使用 readContract 读取余额
+const balanceWETH = await publicClient.readContract({
+    address: addressWETH,
+    abi: [balanceOfAbi],
+    functionName: "balanceOf",
+    args: [address]
+});
+
+// 编码 deposit 函数并发送交易
+const param2 = encodeFunctionData({
+    abi: [depositAbi],
+    functionName: "deposit"
+});
+const tx2 = { to: addressWETH, data: param2, value: parseEther("0.001") };
+const hash = await walletClient.sendTransaction(tx2);
+const receipt = await publicClient.waitForTransactionReceipt({ hash });
+```
+
+#### **主要区别说明**
+- **ABI 处理**：ethers.js 用合约实例的 `interface.encodeFunctionData`，viem 用 `encodeFunctionData` + `parseAbiItem`。
+- **合约实例**：ethers.js 需要创建合约实例，viem 无需实例化。
+- **函数调用**：ethers.js 用 `provider.call(tx)`，viem 用 `publicClient.readContract`。
+- **交易发送**：ethers.js 用 `wallet.sendTransaction`，viem 用 `walletClient.sendTransaction`。
+- **交易等待**：ethers.js 用 `receipt.wait()`，viem 用 `waitForTransactionReceipt`。
+- **ABI 格式**：ethers.js 支持人类可读 ABI 字符串，viem 用 `parseAbiItem` 解析。
+
+#### **Calldata 处理的用途与心得**
+- **底层交互**：calldata 是合约交互的底层机制，理解它有助于深入理解 Web3。
+- **编码解码**：可以手动编码函数调用，也可以解码交易数据。
+- **批量操作**：可以预先编码多个函数调用，然后批量执行。
+- **调试工具**：通过 calldata 可以分析交易的具体内容。
+- **Gas 优化**：手动编码可以优化 gas 使用。
+- **跨链兼容**：calldata 格式在不同链上是通用的。
+
+### **8. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -693,7 +626,7 @@ await publicClient.waitForTransactionReceipt({ hash: hashMint });
 - **函数调用**：ethers.js 用合约实例调用，viem 用 `writeContract`。
 - **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
 
-### **8. 事件查询对比**
+### **9. 事件查询对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -760,135 +693,41 @@ console.log(`地址 ${from} 转账${amount} WETH 到地址 ${to}`);
 - **事件解析**：ethers.js 自动解析 `args`，viem 需要手动解析 `topics` 和 `data`。
 - **格式化**：ethers.js 用 `formatUnits`，viem 用 `formatEther`。
 
-### 9. **事件监听器对比**
+### 10. **事件监听器对比**
 
 #### **Ethers.js 版本**
 ```javascript
-import { ethers } from "ethers";
-import { contractAddressUSDT } from "./0_init.js";
+// 1. 监听一次事件
+contract.once('Transfer', (from, to, value) => {
+    console.log(`监听到一次 Transfer 事件: ${from} -> ${to} ${ethers.formatUnits(value, 6)} USDT`);
+});
 
-const provider = new ethers.JsonRpcProvider("https://eth.merkle.io");
-const contract = new ethers.Contract(contractAddressUSDT, [
-    "event Transfer(address indexed from, address indexed to, uint256 value)"
-], provider);
-
-const main = async () => {
-    console.log("正在连接到 USDT 合约:", contractAddressUSDT);
-    
-    // 1. 监听一次事件
-    contract.once('Transfer', (from, to, value) => {
-        console.log(`1. 监听到一次 Transfer 事件:`);
-        console.log(`   从: ${from}`);
-        console.log(`   到: ${to}`);
-        console.log(`   金额: ${ethers.formatUnits(value, 6)} USDT`);
-    });
-    
-    // 2. 持续监听事件
-    contract.on('Transfer', (from, to, value) => {
-        console.log(`2. 监听到 Transfer 事件:`);
-        console.log(`   从: ${from}`);
-        console.log(`   到: ${to}`);
-        console.log(`   金额: ${ethers.formatUnits(value, 6)} USDT`);
-    });
-    
-    console.log("监听器已启动，按 Ctrl+C 停止...");
-};
-
-main();
+// 2. 持续监听事件
+contract.on('Transfer', (from, to, value) => {
+    console.log(`监听到 Transfer 事件: ${from} -> ${to} ${ethers.formatUnits(value, 6)} USDT`);
+});
 ```
 
 #### **Viem 版本**
 ```javascript
-import { createPublicClient, http, formatUnits, parseAbiItem } from "viem";
-import { mainnet } from "viem/chains";
-import { contractAddressUSDT } from "./0_init_ethersjs.js";
-
-const publicClient = createPublicClient({
-    chain: mainnet,
-    transport: http('https://eth.merkle.io')
-});
-
-const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 amount)");
-
-const main = async () => {
-    try {
-        console.log("正在连接到 USDT 合约:", contractAddressUSDT);
-        const blockNumber = await publicClient.getBlockNumber();
-        console.log("当前区块高度:", blockNumber);
-        
-        // 由于 viem 的 WebSocket 支持有限，使用轮询方式模拟实时监听
-        console.log("1. 使用轮询方式模拟实时监听 Transfer 事件");
-        
-        let lastProcessedBlock = Number(blockNumber);
-        
-        const pollEvents = async () => {
-            try {
-                const currentBlock = await publicClient.getBlockNumber();
-                const currentBlockNumber = Number(currentBlock);
-                
-                if (currentBlockNumber > lastProcessedBlock) {
-                    console.log(`检查区块 ${lastProcessedBlock + 1} 到 ${currentBlockNumber} 的事件...`);
-                    
-                    const events = await publicClient.getLogs({
-                        address: contractAddressUSDT,
-                        event: transferEvent,
-                        fromBlock: BigInt(lastProcessedBlock + 1),
-                        toBlock: currentBlock
-                    });
-                    
-                    if (events.length > 0) {
-                        console.log(`找到 ${events.length} 个新的 Transfer 事件:`);
-                        events.forEach((log, index) => {
-                            const from = '0x' + log.topics[1].slice(26);
-                            const to = '0x' + log.topics[2].slice(26);
-                            const value = formatUnits(log.data, 6);
-                            console.log(`${index + 1}. ${from} -> ${to} ${value} USDT`);
-                        });
-                    }
-                    lastProcessedBlock = currentBlockNumber;
-                }
-            } catch (error) {
-                console.error("轮询错误:", error.message);
-            }
-        };
-        
-        const pollInterval = setInterval(pollEvents, 5000);
-        
-        // 查询最近的 Transfer 事件作为示例
-        console.log("2. 查询最近10个区块的 Transfer 事件作为示例");
-        const recentEvents = await publicClient.getLogs({
-            address: contractAddressUSDT,
-            event: transferEvent,
-            fromBlock: blockNumber - 10n,
-            toBlock: blockNumber
-        });
-        
-        console.log(`最近10个区块中找到 ${recentEvents.length} 个 Transfer 事件`);
-        
-        if (recentEvents.length > 0) {
-            console.log("最近的 Transfer 事件示例:");
-            recentEvents.slice(0, 3).forEach((log, index) => {
-                const from = '0x' + log.topics[1].slice(26);
-                const to = '0x' + log.topics[2].slice(26);
-                const value = formatUnits(log.data, 6);
-                console.log(`${index + 1}. ${from} -> ${to} ${value} USDT`);
-            });
-        }
-        
-        console.log("轮询监听器已启动，按 Ctrl+C 停止...");
-        
-        setTimeout(() => {
-            console.log("停止轮询监听...");
-            clearInterval(pollInterval);
-            process.exit(0);
-        }, 20000);
-        
-    } catch (e) {
-        console.log("连接错误:", e);
-    }
+// 使用轮询方式模拟实时监听
+const pollEvents = async () => {
+    const events = await publicClient.getLogs({
+        address: contractAddressUSDT,
+        event: transferEvent,
+        fromBlock: BigInt(lastProcessedBlock + 1),
+        toBlock: currentBlock
+    });
+    
+    events.forEach((log) => {
+        const from = '0x' + log.topics[1].slice(26);
+        const to = '0x' + log.topics[2].slice(26);
+        const value = formatUnits(log.data, 6);
+        console.log(`${from} -> ${to} ${value} USDT`);
+    });
 };
 
-main();
+const pollInterval = setInterval(pollEvents, 5000);
 ```
 
 #### **主要区别说明**
