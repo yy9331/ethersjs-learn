@@ -18,7 +18,9 @@ etherjs-viem-learn/
 ├── 8_events_listener_ethersjs.js               # 事件监听器
 ├── 9_events_filter_ethersjs.js                 # 事件过滤
 ├── 10_bignumber_ethersjs.js                    # 大数处理
+├── 10_bignumber_viem.js                        # 大数处理 (viem)
 ├── 11_static_call_ethersjs.js                  # 静态调用
+├── 11_static_call_viem.js                      # 静态调用 (viem)
 ├── 12_ERC721Check_ethersjs.js                  # ERC721 检查
 ├── 13_calldata_ethersjs.js                     # Calldata 处理
 ├── 14_HDWallet_ethersjs.js                     # HD 钱包
@@ -378,6 +380,107 @@ await publicClient.waitForTransactionReceipt({ hash: hash2 });
 - **交易确认**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
 - **ABI 支持**：ethers.js 支持人类可读 ABI，viem 支持完整 ABI 对象，也可用 `parseAbiItem` 解析人类可读 ABI 字符串。
 - **关键步骤打印**：viem 版本同样建议在每一步加详细 console.log，便于调试和学习。
+
+### **5. Static Call 对比**
+
+#### **Ethers.js 版本**
+```javascript
+import { ethers } from "ethers";
+import { providerEthByAlchemy as provider, walletMainNetByAlchemy as wallet } from './0_init_ethersjs.js';
+
+const addressDAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
+const contractDAI = new ethers.Contract(addressDAI, [
+    "function balanceOf(address owner) view returns (uint256)",
+    "function transfer(address to, uint256 amount) returns (bool)"
+], provider);
+
+const main = async () => {
+    const address = await wallet.getAddress();
+    const vitalikAddress = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+    
+    // 1. 读取余额
+    const balanceDAI = await contractDAI.balanceOf(address);
+    console.log(`测试钱包 DAI持仓: ${ethers.formatEther(balanceDAI)}`);
+    
+    // 2. staticCall 模拟转账（不会真正执行）
+    try {
+        await contractDAI.transfer.staticCall(
+            address, // 转账给测试钱包
+            ethers.parseEther("1"),
+            {from: vitalikAddress} // Vitalik作为发送方
+        );
+        console.log("交易会成功吗？：成功");
+    } catch (error) {
+        console.log(`交易失败：${error.reason}`);
+    }
+};
+
+main();
+```
+
+#### **Viem 版本**
+```javascript
+import { createPublicClient, http, formatEther, parseEther, parseAbiItem } from "viem";
+import { mainnet } from "viem/chains";
+import { walletMainNetByAlchemy as wallet } from './0_init_ethersjs.js';
+import dotenv from "dotenv";
+dotenv.config();
+
+const publicClient = createPublicClient({
+    chain: mainnet,
+    transport: http(process.env.MAINNET_RPC_URL_ALCHEMY)
+});
+
+const addressDAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
+
+const main = async () => {
+    const address = await wallet.getAddress();
+    const vitalikAddress = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+    
+    // 1. 读取余额
+    const balanceOfAbi = parseAbiItem("function balanceOf(address owner) view returns (uint256)");
+    const balanceDAI = await publicClient.readContract({
+        address: addressDAI,
+        abi: [balanceOfAbi],
+        functionName: 'balanceOf',
+        args: [address]
+    });
+    console.log(`测试钱包 DAI持仓: ${formatEther(balanceDAI)}`);
+    
+    // 2. simulateContract 模拟转账（不会真正执行）
+    try {
+        const transferAbi = parseAbiItem("function transfer(address to, uint256 amount) returns (bool)");
+        await publicClient.simulateContract({
+            address: addressDAI,
+            abi: [transferAbi],
+            functionName: 'transfer',
+            args: [address, parseEther("1")],
+            account: vitalikAddress // Vitalik作为发送方
+        });
+        console.log("交易会成功吗？：成功");
+    } catch (error) {
+        console.log(`交易失败：${error.message}`);
+    }
+};
+
+main();
+```
+
+#### **主要区别说明**
+- **API 名称**：ethers.js 用 `staticCall`，viem 用 `simulateContract`。
+- **参数传递**：ethers.js 直接传递参数，viem 用对象参数。
+- **身份模拟**：ethers.js 用 `{from: ...}`，viem 用 `account: ...`。
+- **错误信息**：viem 的错误信息更详细，包含合约 revert 的具体原因。
+- **ABI 处理**：ethers.js 支持人类可读 ABI，viem 可用 `parseAbiItem` 解析。
+- **返回值**：ethers.js 直接返回函数结果，viem 返回模拟结果对象。
+
+#### **使用场景与心得**
+- **本质作用一致**：都是"链上模拟"，不会真正发起交易，适合前端/后端/批量校验。
+- **API 风格不同**：ethers.js 偏向面向对象，viem 偏向函数式和对象参数。
+- **错误信息**：viem 的错误信息更详细，能直接看到合约 revert 的原因，非常适合调试和前端提示。
+- **身份模拟**：两者都支持模拟任意地址发起交易（msg.sender），但 viem 用 `account` 字段更直观。
+- **依赖 RPC 质量**：无论哪种方式，主网大合约建议用 Alchemy/Infura/QuickNode 等主流服务，免费节点极易超时。
+- **最佳实践**：建议在 DApp 前端、批量脚本、合约测试等场景优先用 static call/simulateContract 预演，避免无谓的链上失败和 gas 损失。
 
 ### **6. 合约部署对比**
 
