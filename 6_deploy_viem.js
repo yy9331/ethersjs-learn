@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createWalletClient, createPublicClient, http, parseEther, formatEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
-import abiERC20 from "./6_abi_source_ethersjs.js";
+import abiERC20 from "./6_abi_human_readable.json" assert { type: "json" };
 import bytecodeERC20 from "./6_bytecode_ethersjs.js";
 
 // 用私钥创建钱包对象
@@ -105,32 +105,3 @@ main().catch((error) => {
   console.error(error);
   process.exit(1);
 });
-// 钱包ETH余额: 1.29435307196590216
-// 1. 利用walletClient部署ERC20代币合约
-// 部署交易hash: 0x5017a940e7e53eae4768ac0b2bbab6deb64317969f41e54be11f033cc17ddd1b
-// 合约地址: 0x822d0421a0e6843045f073c341defdd46aac8c42
-// 部署合约的交易详情： {
-//   type: 'eip1559',
-//   status: 'success',
-//   cumulativeGasUsed: 15711613n,
-//   logs: [],
-//   logsBloom: '0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000',
-//   transactionHash: '0x5017a940e7e53eae4768ac0b2bbab6deb64317969f41e54be11f033cc17ddd1b',
-//   transactionIndex: 189,
-//   blockHash: '0xf76ea59037753602fa69e6c40a467d3e775f2e1b2c6eec6539a8632bf0f4bcc8',
-//   blockNumber: 8830944n,
-//   gasUsed: 858426n,
-//   effectiveGasPrice: 2086247n,
-//   from: '0xbd61c00e4b7c2a77cd660304ddd852379f705ed6',
-//   to: null,
-//   contractAddress: '0x822d0421a0e6843045f073c341defdd46aac8c42'
-// }
-// 2. 调用mint()函数，给自己地址mint 86768代币
-// 等待mint交易上链: 0x6df17875d4c47cbe29e4f4072ca6f1a7db9dcff4b245ff4bc35038eff9a1d625
-// 合约名称: CM2 Token
-// 合约代号: CM2
-// mint后地址中代币余额: 86768
-// 代币总供给: 86768
-// 3. 调用transfer()函数，给Vitalik转账1,000代币
-// 等待transfer交易上链: 0x8dff4e7330f40251107f5c8f31219682397b9005ee8020c8d4b4d0bb7989121c
-// Vitalik钱包中的代币余额: 1000

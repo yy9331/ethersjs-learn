@@ -293,7 +293,7 @@ const symbolWETH = await readContract(client, {
     functionName: 'symbol'
 });
 
-// 需要完整的 ABI 对象格式
+// 方法1: 使用完整的 ABI 对象格式
 const abiERC20 = [
     {
         "constant": true,
@@ -305,6 +305,10 @@ const abiERC20 = [
     },
     // ... 更多 ABI 定义
 ];
+
+// 方法2: 使用 parseAbiItem 解析人类可读的 ABI 字符串
+import { parseAbiItem } from "viem";
+const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 amount)");
 ```
 
 ### **3. 发送 ETH 对比**
@@ -372,33 +376,142 @@ await publicClient.waitForTransactionReceipt({ hash: hash2 });
 - **写操作**：ethers.js 用 `connect(wallet)` 绑定签名者，viem 用 `walletClient` 直接发起写操作。
 - **ENS 支持**：ethers.js 支持直接用 ENS 地址，viem 需先解析 ENS 得到地址。
 - **交易确认**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
-- **ABI 支持**：ethers.js 支持人类可读 ABI，viem 需完整 ABI 对象。
+- **ABI 支持**：ethers.js 支持人类可读 ABI，viem 支持完整 ABI 对象，也可用 `parseAbiItem` 解析人类可读 ABI 字符串。
 - **关键步骤打印**：viem 版本同样建议在每一步加详细 console.log，便于调试和学习。
 
-### **5. 部署合约对比**
+### **6. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
+import { ethers } from "ethers";
+import { walletSepoliaInfura, providerSepoliaAlchemy } from "./0_init.js";
+
+const wallet = walletSepoliaInfura;
+const provider = providerSepoliaAlchemy;
+
+// 创建合约工厂
 const factoryERC20 = new ethers.ContractFactory(abiERC20, bytecodeERC20, wallet);
+
+// 部署合约
 const contractERC20 = await factoryERC20.deploy('CM2 Token', 'CM2');
+console.log(`合约地址: ${contractERC20.target}`);
 await contractERC20.waitForDeployment();
+
+// 调用mint函数
+let tx = await contractERC20.mint("86768");
+await tx.wait();
 ```
 
 #### **Viem 版本**
 ```javascript
-const hash = await walletClient.deployContract({
-  abi: abiERC20,
-  bytecode: bytecodeERC20,
-  args: ['CM2 Token', 'CM2']
+import { createWalletClient, createPublicClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { sepolia } from "viem/chains";
+
+const account = privateKeyToAccount(process.env.WALLET_PRIVATE_KEY);
+
+const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: http()
 });
-await publicClient.waitForTransactionReceipt({ hash });
+const walletClient = createWalletClient({
+    account,
+    chain: sepolia,
+    transport: http()
+});
+
+// 部署合约
+const hash = await walletClient.deployContract({
+    abi: abiERC20,
+    bytecode: bytecodeERC20,
+    args: ['CM2 Token', 'CM2']
+});
+const receipt = await publicClient.waitForTransactionReceipt({ hash });
+const contractAddress = receipt.contractAddress;
+
+// 调用mint函数
+const hashMint = await walletClient.writeContract({
+    address: contractAddress,
+    abi: abiERC20,
+    functionName: "mint",
+    args: ["86768"]
+});
+await publicClient.waitForTransactionReceipt({ hash: hashMint });
 ```
 
 #### **主要区别说明**
-- **部署方式**：ethers.js 用 `ContractFactory.deploy`，viem 用 `walletClient.deployContract`。
-- **参数传递**：两者都支持构造参数，viem 需显式传递 `args`。
-- **合约交互**：ethers.js 直接用合约实例，viem 需每次传递合约地址和 ABI。
-- **关键步骤打印**：viem 版本同样建议在每一步加详细 console.log，便于调试和学习。
+- **合约工厂**：ethers.js 用 `ContractFactory`，viem 直接用 `deployContract`。
+- **部署方式**：ethers.js 返回合约实例，viem 返回交易哈希。
+- **合约地址**：ethers.js 用 `contract.target`，viem 从交易收据中获取。
+- **函数调用**：ethers.js 用合约实例调用，viem 用 `writeContract`。
+- **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
+
+### **7. 事件查询对比**
+
+#### **Ethers.js 版本**
+```javascript
+import { ethers } from "ethers";
+
+// 创建合约实例
+const contract = new ethers.Contract(addressWETH, abiWETH, provider);
+
+// 查询事件
+const events = await contract.queryFilter('Transfer', fromBlock, toBlock);
+
+// 解析事件
+const amount = ethers.formatUnits(ethers.getBigInt(events[0].args["amount"]), "ether");
+console.log(`地址 ${events[0].args["from"]} 转账${amount} WETH 到地址 ${events[0].args["to"]}`);
+```
+
+#### **Viem 版本**
+```javascript
+import { createPublicClient, http, formatEther, parseAbiItem } from "viem";
+
+const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: http()
+});
+
+// 方法1: 使用 parseAbiItem 解析人类可读的 ABI 字符串
+const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 amount)");
+
+// 查询事件
+const events = await publicClient.getLogs({
+    address: addressWETH,
+    event: transferEvent,
+    fromBlock: BigInt(fromBlock),
+    toBlock: BigInt(toBlock)
+});
+
+// 方法2: 直接定义事件对象
+// const events = await publicClient.getLogs({
+//     address: addressWETH,
+//     event: {
+//         type: 'event',
+//         name: 'Transfer',
+//         inputs: [
+//             { type: 'address', name: 'from', indexed: true },
+//             { type: 'address', name: 'to', indexed: true },
+//             { type: 'uint256', name: 'amount', indexed: false }
+//         ]
+//     },
+//     fromBlock: BigInt(fromBlock),
+//     toBlock: BigInt(toBlock)
+// });
+
+// 解析事件
+const from = '0x' + events[0].topics[1].slice(26);
+const to = '0x' + events[0].topics[2].slice(26);
+const amount = formatEther(events[0].data);
+console.log(`地址 ${from} 转账${amount} WETH 到地址 ${to}`);
+```
+
+#### **主要区别说明**
+- **事件查询**：ethers.js 用 `contract.queryFilter()`，viem 用 `publicClient.getLogs()`。
+- **事件定义**：ethers.js 用 ABI 字符串，viem 可用事件对象定义或 `parseAbiItem` 解析 ABI 字符串。
+- **参数类型**：ethers.js 用数字，viem 用 `BigInt`。
+- **事件解析**：ethers.js 自动解析 `args`，viem 需要手动解析 `topics` 和 `data`。
+- **格式化**：ethers.js 用 `formatUnits`，viem 用 `formatEther`。
 
 ## 📈 性能测试结果
 
@@ -471,7 +584,7 @@ Vitalik持仓: 0
 - ✅ 需要向后兼容
 - ✅ 团队熟悉 ethers.js
 - ✅ 需要特定的 ethers.js 功能
-- ✅ 需要人类可读的 ABI 格式
+- ✅ 需要更丰富的错误信息
 - ✅ 面向对象编程偏好
 - ✅ 需要更丰富的错误信息
 
