@@ -39,3 +39,10 @@ const main = async () => {
 }
 
 main()
+// 1. 读取ERC721合约信息
+// 合约地址: 0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d
+// 名称: BoredApeYachtClub
+// 代号: BAYC
+
+// 2. 利用ERC165的supportsInterface，确定合约是否为ERC721标准
+// 合约是否为ERC721标准: true

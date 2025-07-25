@@ -6,22 +6,36 @@
 
 ```
 etherjs-viem-learn/
-├── 0_init.js                                    # 初始化配置
+├── 0_init_ethersjs.js                          # 初始化配置
+├── 0_test_rpc.js                               # RPC 测试
+├── 0_test_viem_rpc.js                          # viem RPC 测试
 ├── 1_HelloVitalik_ethersjs.js                  # ethers.js 示例
 ├── 1_HelloVitalik_viem.js                      # viem 示例
 ├── 2_provider_ethersjs.js                      # Provider 模式
 ├── 3_contract_ethersjs.js                      # 合约交互
+├── 3_contract_viem.js                          # 合约交互 (viem)
+├── 3_contract_abiERC20_viem.js                 # 合约 ABI 处理 (viem)
 ├── 4_sendEth_ethersjs.js                       # 发送 ETH
+├── 4_sendEth_viem.js                           # 发送 ETH (viem)
 ├── 5_writeContract_ethersjs.js                 # 写入合约
+├── 5_writeContract_viem.js                     # 写入合约 (viem)
 ├── 6_deploy_ethersjs.js                        # 部署合约
+├── 6_deploy_viem.js                            # 部署合约 (viem)
+├── 6_abi_source_ethersjs.js                    # ABI 源码解析
+├── 6_abi_human_readable_ethersjs.js            # 人类可读 ABI
+├── 6_bytecode_ethersjs.js                      # 字节码处理
 ├── 7_events_ethersjs.js                        # 事件监听
+├── 7_events_viem.js                            # 事件监听 (viem)
 ├── 8_events_listener_ethersjs.js               # 事件监听器
+├── 8_events_listener_viem.js                   # 事件监听器 (viem)
 ├── 9_events_filter_ethersjs.js                 # 事件过滤
+├── 9_events_filter_viem.js                     # 事件过滤 (viem)
 ├── 10_bignumber_ethersjs.js                    # 大数处理
 ├── 10_bignumber_viem.js                        # 大数处理 (viem)
 ├── 11_static_call_ethersjs.js                  # 静态调用
 ├── 11_static_call_viem.js                      # 静态调用 (viem)
 ├── 12_ERC721Check_ethersjs.js                  # ERC721 检查
+├── 12_ERC721Check_viem.js                      # ERC721 检查 (viem)
 ├── 13_calldata_ethersjs.js                     # Calldata 处理
 ├── 14_HDWallet_ethersjs.js                     # HD 钱包
 ├── 15_batchTransfer_ethersjs.js                # 批量转账
@@ -34,7 +48,15 @@ etherjs-viem-learn/
 ├── 22_provider_wallet_connector_read_only_ethersjs.html      # Provider 钱包连接器
 ├── 22_signer_wallet_connector_can_send_receive_ethersjs.html # Signer 钱包连接器
 ├── 23_signer_wallet_connector_react_ethersjs.html           # React 钱包连接器
-└── test_viem_rpc.js                            # viem RPC 测试
+├── convert_abi.js                               # ABI 转换工具
+├── extra_VerifyWETHAddress.js                   # WETH 地址验证
+├── extra_WETHCompleteDemo.js                    # WETH 完整演示
+├── 5_abiWETH.json                               # WETH ABI 文件
+├── 17_contract.json                             # 合约 JSON 文件
+├── 18_contract.json                             # 合约 JSON 文件
+├── ERC20/                                       # ERC20 合约目录
+├── ERC721withMercleTreeProof/                   # ERC721 Merkle 树证明目录
+└── package.json                                 # 项目配置
 ```
 
 ## 🚀 快速开始
@@ -482,7 +504,129 @@ main();
 - **依赖 RPC 质量**：无论哪种方式，主网大合约建议用 Alchemy/Infura/QuickNode 等主流服务，免费节点极易超时。
 - **最佳实践**：建议在 DApp 前端、批量脚本、合约测试等场景优先用 static call/simulateContract 预演，避免无谓的链上失败和 gas 损失。
 
-### **6. 合约部署对比**
+### **6. ERC721 接口检查对比**
+
+#### **Ethers.js 版本**
+```javascript
+import { ethers } from "ethers";
+import { nameFunctionAbi, symbolFuncstionAbi, supportsInterfaceFunctionAbi, providerEthByAlchemy as provider } from './0_init_ethersjs.js';
+
+const addressBAYC = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d";
+const contractERC721 = new ethers.Contract(addressBAYC, [
+    ...nameFunctionAbi, 
+    ...symbolFuncstionAbi, 
+    ...supportsInterfaceFunctionAbi
+], provider);
+
+const selectorERC721 = "0x80ac58cd"; // ERC721 interface identifier
+
+const main = async () => {
+    try {
+        // 1. 读取合约基本信息
+        const nameERC721 = await contractERC721.name();
+        const symbolERC721 = await contractERC721.symbol();
+        console.log(`名称: ${nameERC721}`);
+        console.log(`代号: ${symbolERC721}`);
+        
+        // 2. 检查是否为ERC721标准
+        const isERC721 = await contractERC721.supportsInterface(selectorERC721);
+        console.log(`合约是否为ERC721标准: ${isERC721}`);
+    } catch (e) {
+        console.log(e);
+    }
+};
+
+main();
+```
+
+#### **Viem 版本**
+```javascript
+import { createPublicClient, http, parseAbiItem } from "viem";
+import { mainnet } from "viem/chains";
+import dotenv from "dotenv";
+dotenv.config();
+
+const publicClient = createPublicClient({
+    chain: mainnet,
+    transport: http(process.env.MAINNET_RPC_URL_ALCHEMY)
+});
+
+const addressBAYC = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d";
+const selectorERC721 = "0x80ac58cd";
+
+const main = async () => {
+    try {
+        // 使用 parseAbiItem 解析 ABI
+        const nameAbi = parseAbiItem("function name() view returns (string)");
+        const symbolAbi = parseAbiItem("function symbol() view returns (string)");
+        const supportsInterfaceAbi = parseAbiItem("function supportsInterface(bytes4 interfaceId) view returns (bool)");
+        
+        // 1. 读取合约基本信息
+        const nameERC721 = await publicClient.readContract({
+            address: addressBAYC,
+            abi: [nameAbi],
+            functionName: 'name'
+        });
+        
+        const symbolERC721 = await publicClient.readContract({
+            address: addressBAYC,
+            abi: [symbolAbi],
+            functionName: 'symbol'
+        });
+        
+        console.log(`名称: ${nameERC721}`);
+        console.log(`代号: ${symbolERC721}`);
+        
+        // 2. 检查是否为ERC721标准
+        const isERC721 = await publicClient.readContract({
+            address: addressBAYC,
+            abi: [supportsInterfaceAbi],
+            functionName: 'supportsInterface',
+            args: [selectorERC721]
+        });
+        
+        console.log(`合约是否为ERC721标准: ${isERC721}`);
+        
+        // 3. 额外检查其他接口支持情况
+        const selectorERC1155 = "0xd9b67a26";
+        const selectorERC165 = "0x01ffc9a7";
+        const selectorERC2981 = "0x2a55205a";
+        
+        const isERC1155 = await publicClient.readContract({
+            address: addressBAYC,
+            abi: [supportsInterfaceAbi],
+            functionName: 'supportsInterface',
+            args: [selectorERC1155]
+        });
+        
+        console.log(`是否为ERC1155标准: ${isERC1155}`);
+        console.log(`是否为ERC165标准: ${isERC165}`);
+        console.log(`是否支持ERC2981版税: ${isERC2981}`);
+        
+    } catch (e) {
+        console.log("检查失败:", e.message);
+    }
+};
+
+main();
+```
+
+#### **主要区别说明**
+- **ABI 处理**：ethers.js 用预定义 ABI 数组，viem 用 `parseAbiItem` 解析人类可读 ABI 字符串。
+- **合约实例**：ethers.js 需要创建合约实例，viem 直接用 `readContract`。
+- **函数调用**：ethers.js 用 `contract.function()`，viem 用 `publicClient.readContract()`。
+- **参数传递**：ethers.js 直接传递参数，viem 用 `args` 数组。
+- **错误处理**：ethers.js 抛出异常，viem 返回详细错误信息。
+
+#### **ERC721 接口检查的用途与心得**
+- **合约类型识别**：通过 ERC165 的 `supportsInterface` 可以准确判断合约是否符合 ERC721 标准。
+- **前端兼容性**：DApp 前端可以根据接口支持情况显示不同的交互界面。
+- **批量验证**：可以批量检查多个合约地址，筛选出真正的 NFT 合约。
+- **接口扩展性**：除了 ERC721，还可以检查 ERC1155、ERC2981 等其他接口支持。
+- **安全验证**：避免与不符合标准的合约交互，减少错误和风险。
+- **市场应用**：NFT 市场、钱包等应用需要准确识别合约类型来提供相应功能。
+
+### **7. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -549,7 +693,7 @@ await publicClient.waitForTransactionReceipt({ hash: hashMint });
 - **函数调用**：ethers.js 用合约实例调用，viem 用 `writeContract`。
 - **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
 
-### **7. 事件查询对比**
+### **8. 事件查询对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -616,7 +760,7 @@ console.log(`地址 ${from} 转账${amount} WETH 到地址 ${to}`);
 - **事件解析**：ethers.js 自动解析 `args`，viem 需要手动解析 `topics` 和 `data`。
 - **格式化**：ethers.js 用 `formatUnits`，viem 用 `formatEther`。
 
-### 8. **事件监听器对比**
+### 9. **事件监听器对比**
 
 #### **Ethers.js 版本**
 ```javascript
