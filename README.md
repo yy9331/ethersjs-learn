@@ -49,7 +49,8 @@ etherjs-viem-learn/
 ├── 18_signature_ethersjs.js                    # 签名验证 (ethers.js)
 ├── 18_signature_viem.js                        # 签名验证 (viem)
 ├── 19_mempool_ethersjs.js                      # 内存池
-├── 20_decodePendingTx_ethersjs.js              # 解码待处理交易
+├── 20_decodePendingTx_ethersjs.js              # 解码待处理交易 (ethers.js)
+├── 20_decodePendingTx_viem.js                  # 解码待处理交易 (viem)
 ├── 21_VanityAddr_ethersjs.js                   # 靓号地址
 ├── 22_provider_wallet_connector_read_only_ethersjs.html      # Provider 钱包连接器
 ├── 22_signer_wallet_connector_can_send_receive_ethersjs.html # Signer 钱包连接器
@@ -1031,6 +1032,88 @@ await publicClient.waitForTransactionReceipt({ hash });
 - **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt()`。
 - **签名格式**：viem 生成 132 字符长度的签名。
 
+### **14. 解码待处理交易对比**
+
+#### **Ethers.js 版本**
+```javascript
+// 创建 WebSocket provider
+const provider = new ethers.WebSocketProvider(process.env.SEPOLIA_WSSURL);
+
+// 创建 interface 对象
+const iface = new ethers.Interface(contractABI);
+const selector = iface.getFunction("transfer").selector;
+
+// 监听 pending 交易
+provider.on('pending', async (txHash) => {
+    const tx = await provider.getTransaction(txHash);
+    if (tx && tx.data.indexOf(selector) !== -1) {
+        const decoded = iface.parseTransaction(tx);
+        console.log(`转账目标地址: ${decoded.args[0]}`);
+        console.log(`转账金额: ${ethers.formatEther(decoded.args[1])}`);
+    }
+});
+```
+
+#### **Viem 版本**
+```javascript
+// 创建 WebSocket 客户端
+const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: webSocket(process.env.SEPOLIA_WSSURL)
+});
+
+// 创建 ABI 接口
+const transferAbi = parseAbiItem("function transfer(address, uint256) returns (bool)");
+const selector = "0xa9059cbb";
+
+// 监听 pending 交易
+publicClient.watchPendingTransactions({
+    onTransactions: async (txHashes) => {
+        for (const txHash of txHashes) {
+            const tx = await publicClient.getTransaction({ hash: txHash });
+            if (tx && tx.data.startsWith(selector)) {
+                const decoded = decodeFunctionData({
+                    abi: [transferAbi],
+                    data: tx.data
+                });
+                console.log(`转账目标地址: ${decoded.args[0]}`);
+                console.log(`转账金额: ${decoded.args[1]}`);
+            }
+        }
+    }
+});
+```
+
+#### **主要区别说明**
+- **WebSocket 连接**：ethers.js 用 `WebSocketProvider`，viem 用 `webSocket()`。
+- **ABI 解析**：ethers.js 用 `Interface`，viem 用 `parseAbiItem()`。
+- **函数选择器**：ethers.js 用 `getFunction().selector`，viem 直接使用十六进制字符串。
+- **交易监听**：ethers.js 用 `provider.on('pending')`，viem 用 `watchPendingTransactions()`。
+- **交易解码**：ethers.js 用 `parseTransaction()`，viem 用 `decodeFunctionData()`。
+- **数据匹配**：ethers.js 用 `indexOf()`，viem 用 `startsWith()`。
+
+#### **解码待处理交易的用途与心得**
+- **实时监控**：监控网络中的 pending 交易，获取最新交易信息。
+- **交易分析**：解码交易数据，了解交易的具体内容和参数。
+- **套利机会**：监控特定类型的交易，寻找套利机会。
+- **MEV 策略**：分析 pending 交易，实施 MEV 策略。
+- **Gas 优化**：监控 gas 价格变化，优化交易时机。
+- **安全监控**：监控可疑交易，提高安全性。
+
+#### **实际运行结果**
+- **WebSocket 连接**：✅ 成功连接到 Sepolia 网络的 WebSocket
+- **交易监听**：✅ 成功监听 pending 交易
+- **交易解码**：✅ 成功解码 ERC20 transfer 交易
+- **函数选择器**：✅ 正确识别 `0xa9059cbb` 选择器
+- **实时监控**：✅ 程序持续运行，监控网络交易
+
+#### **技术要点**
+- **WebSocket 连接**：使用 viem 的 webSocket 传输层
+- **交易监听**：使用 watchPendingTransactions API
+- **ABI 解析**：使用 parseAbiItem 解析函数签名
+- **交易解码**：使用 decodeFunctionData 解码交易数据
+- **选择器匹配**：使用 startsWith 匹配函数选择器
+
 #### **签名验证的用途与心得**
 - **身份验证**：通过签名验证用户身份，确保只有授权用户可以铸造。
 - **防重放攻击**：使用 nonce 或时间戳防止签名被重复使用。
@@ -1054,7 +1137,7 @@ await publicClient.waitForTransactionReceipt({ hash });
 - **权限验证**：验证当前钱包是否为合约所有者
 - **错误处理**：完善的错误处理机制，包括网络、合约和签名错误
 
-### **14. 合约部署对比**
+### **15. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -1121,7 +1204,7 @@ await publicClient.waitForTransactionReceipt({ hash: hashMint });
 - **函数调用**：ethers.js 用合约实例调用，viem 用 `writeContract`。
 - **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
 
-### **15. 事件查询对比**
+### **16. 事件查询对比**
 
 #### **Ethers.js 版本**
 ```javascript
