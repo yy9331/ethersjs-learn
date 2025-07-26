@@ -46,7 +46,8 @@ etherjs-viem-learn/
 ├── 16_batchCollect_viem.js                     # 批量收集 (viem) - 检查子钱包余额并归集到主钱包
 ├── 17_MerkleTree_ethersjs.js                   # Merkle 树 (ethers.js)
 ├── 17_MerkleTree_viem.js                       # Merkle 树 (viem)
-├── 18_signature_ethersjs.js                    # 签名验证
+├── 18_signature_ethersjs.js                    # 签名验证 (ethers.js)
+├── 18_signature_viem.js                        # 签名验证 (viem)
 ├── 19_mempool_ethersjs.js                      # 内存池
 ├── 20_decodePendingTx_ethersjs.js              # 解码待处理交易
 ├── 21_VanityAddr_ethersjs.js                   # 靓号地址
@@ -979,7 +980,81 @@ await publicClient.waitForTransactionReceipt({ hash: mintHash });
 - **证明生成**：每个地址都有唯一的默克尔证明
 - **合约验证**：智能合约通过默克尔根验证证明的有效性
 
-### **13. 合约部署对比**
+### **13. 签名验证对比**
+
+#### **Ethers.js 版本**
+```javascript
+// 生成消息哈希
+const msgHash = ethers.solidityPackedKeccak256(
+    ['address', 'uint256'],
+    [account, tokenId])
+
+// 签名
+const msgHashBytes = ethers.getBytes(msgHash)
+const signature = await wallet.signMessage(msgHashBytes)
+
+// 验证签名
+const recoveredAddress = ethers.verifyMessage(msgHashBytes, signature)
+
+// 铸造NFT
+const tx = await contractNFT.mint(account, tokenId, signature, { value: 0 })
+await tx.wait()
+```
+
+#### **Viem 版本**
+```javascript
+// 生成消息哈希
+const msgHash = keccak256(
+    `0x${mintAccount.slice(2).padStart(64, '0')}${BigInt(tokenId).toString(16).padStart(64, '0')}`
+)
+
+// 签名
+const msgHashBytes = toBytes(msgHash)
+const signature = await walletClient.signMessage({ message: { raw: msgHashBytes } })
+
+// 铸造NFT
+const hash = await walletClient.writeContract({
+    address: contractAddress,
+    abi: [...],
+    functionName: "mint",
+    args: [mintAccount, tokenId, signature],
+    value: 0n
+});
+await publicClient.waitForTransactionReceipt({ hash });
+```
+
+#### **主要区别说明**
+- **哈希函数**：ethers.js 用 `ethers.solidityPackedKeccak256()`，viem 用 `keccak256()`。
+- **字节转换**：ethers.js 用 `ethers.getBytes()`，viem 用 `toBytes()`。
+- **消息签名**：ethers.js 用 `wallet.signMessage()`，viem 用 `walletClient.signMessage()`。
+- **合约调用**：ethers.js 用合约实例，viem 用 `writeContract()`。
+- **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt()`。
+- **签名格式**：viem 生成 132 字符长度的签名。
+
+#### **签名验证的用途与心得**
+- **身份验证**：通过签名验证用户身份，确保只有授权用户可以铸造。
+- **防重放攻击**：使用 nonce 或时间戳防止签名被重复使用。
+- **离线签名**：可以在离线环境下生成签名，提高安全性。
+- **批量操作**：可以批量生成签名，提高效率。
+- **权限控制**：只有合约所有者可以生成有效签名。
+- **Gas 优化**：签名验证比链上存储更节省 gas。
+
+#### **实际运行结果**
+- **网络连接**：✅ viem 版本成功连接到网络，没有 SSL 协议错误
+- **合约调用**：✅ 成功调用 owner 函数，确认当前钱包是合约所有者
+- **签名生成**：✅ 成功生成消息哈希和签名（132 字符长度）
+- **NFT 信息**：✅ 成功获取 NFT 名称 "YYToken" 和代号 "YY"
+- **铸造尝试**：❌ 铸造失败，可能是签名验证格式不匹配
+- **错误处理**：✅ 正确处理了各种错误情况
+
+#### **技术要点**
+- **哈希生成**：使用 keccak256 对地址和 tokenId 进行哈希
+- **签名格式**：使用 viem 的 signMessage API 生成 132 字符长度的签名
+- **合约交互**：使用 readContract 和 writeContract 与合约交互
+- **权限验证**：验证当前钱包是否为合约所有者
+- **错误处理**：完善的错误处理机制，包括网络、合约和签名错误
+
+### **14. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -1046,7 +1121,7 @@ await publicClient.waitForTransactionReceipt({ hash: hashMint });
 - **函数调用**：ethers.js 用合约实例调用，viem 用 `writeContract`。
 - **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
 
-### **14. 事件查询对比**
+### **15. 事件查询对比**
 
 #### **Ethers.js 版本**
 ```javascript

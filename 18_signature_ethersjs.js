@@ -6,7 +6,7 @@ const main = async () => {
         // 1. 部署这份合约:
         // 2. 复制 Remix 下的 artifacts/SignatureNFT.json, 放到 18_contract.json里
         // 3. 粘贴合约地址: 部署后粘贴在这里
-        const contractAddress = "0x你的合约地址" // 请替换为你的合约地址
+        const contractAddress = "0xA6E44D8Ce0e91f29793c8519aDbD32Ef9726734e" // 请替换为你的合约地址
         const contractNFT = new ethers.Contract(contractAddress, [
             "function mint(address account, uint256 tokenId, bytes calldata signature) public payable",
             "function owner() public view returns (address)",
