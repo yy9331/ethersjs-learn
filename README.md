@@ -44,7 +44,8 @@ etherjs-viem-learn/
 ├── 15_batchTransfer_viem.js                    # 批量转账 (viem) - HD钱包派生20个地址并转账
 ├── 16_batchCollect_ethersjs.js                 # 批量收集 (ethers.js)
 ├── 16_batchCollect_viem.js                     # 批量收集 (viem) - 检查子钱包余额并归集到主钱包
-├── 17_MerkleTree_ethersjs.js                   # Merkle 树
+├── 17_MerkleTree_ethersjs.js                   # Merkle 树 (ethers.js)
+├── 17_MerkleTree_viem.js                       # Merkle 树 (viem)
 ├── 18_signature_ethersjs.js                    # 签名验证
 ├── 19_mempool_ethersjs.js                      # 内存池
 ├── 20_decodePendingTx_ethersjs.js              # 解码待处理交易
@@ -890,7 +891,95 @@ for (let i = 0; i < walletsWithBalance.length; i++) {
 | **余额查询** | `provider.getBalance()` | `publicClient.getBalance()` |
 | **子钱包创建** | `new ethers.Wallet()` | `createWalletClient()` |
 
-### **12. 合约部署对比**
+### **12. Merkle Tree 对比**
+
+#### **Ethers.js 版本**
+```javascript
+// 生成默克尔树
+const leaves = whitelistAddresses.map(x => ethers.keccak256(x));
+const merkletree = new MerkleTree(leaves, ethers.keccak256, { sortPairs: true });
+const root = merkletree.getHexRoot();
+
+// 验证白名单
+function verifyWhitelist(address) {
+    const leaf = ethers.keccak256(address);
+    const proof = merkletree.getHexProof(leaf);
+    const isValid = merkletree.verify(proof, leaf, root);
+    return { isValid, proof };
+}
+
+// 部署合约
+const factoryNFT = new ethers.ContractFactory(abiNFT, bytecodeNFT, wallet);
+const nftContract = await factoryNFT.deploy(contractName, contractSymbol, root);
+await nftContract.waitForDeployment();
+
+// 铸造NFT
+const mintTx = await nftContract.mint(mintToAddress, tokenId, proof);
+await mintTx.wait();
+```
+
+#### **Viem 版本**
+```javascript
+// 生成默克尔树
+const leaves = whitelistAddresses.map(x => keccak256(x));
+const merkletree = new MerkleTree(leaves, keccak256, { sortPairs: true });
+const root = merkletree.getHexRoot();
+
+// 验证白名单
+function verifyWhitelist(address) {
+    const leaf = keccak256(address);
+    const proof = merkletree.getHexProof(leaf);
+    const isValid = merkletree.verify(proof, leaf, root);
+    return { isValid, proof };
+}
+
+// 部署合约
+const hash = await walletClient.deployContract({
+    abi: abiNFT,
+    bytecode: bytecodeNFT,
+    args: [contractName, contractSymbol, root]
+});
+const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+// 铸造NFT
+const mintHash = await walletClient.writeContract({
+    address: contractAddress,
+    abi: abiNFT,
+    functionName: "mint",
+    args: [mintToAddress, tokenId, proof]
+});
+await publicClient.waitForTransactionReceipt({ hash: mintHash });
+```
+
+#### **主要区别说明**
+- **哈希函数**：ethers.js 用 `ethers.keccak256()`，viem 用 `keccak256()`。
+- **合约部署**：ethers.js 用 `ContractFactory`，viem 用 `deployContract()`。
+- **合约调用**：ethers.js 用合约实例，viem 用 `writeContract()`。
+- **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt()`。
+- **合约读取**：ethers.js 用合约实例，viem 用 `readContract()`。
+
+#### **Merkle Tree 的用途与心得**
+- **白名单验证**：通过默克尔树验证地址是否在白名单中。
+- **Gas 优化**：只需要提供证明，不需要存储完整白名单。
+- **隐私保护**：不需要在链上暴露完整白名单。
+- **批量操作**：可以批量验证多个地址。
+- **离线验证**：可以在链下验证地址是否在白名单中。
+- **NFT 铸造**：常用于 NFT 项目的白名单铸造。
+
+#### **实际运行结果**
+- **合约部署**：成功部署到地址 `0xb1b2d9c6a5f2a6b904f257126dfe7d875f70cfd4`
+- **白名单验证**：正确验证了 4 个白名单地址和 1 个非白名单地址
+- **NFT 铸造**：成功为白名单地址铸造了 Token ID 1
+- **安全测试**：非白名单地址铸造失败，返回 "Invalid merkle proof" 错误
+- **离线验证**：所有地址的验证结果都正确
+
+#### **技术要点**
+- **默克尔根**：`0xeeefd63003e0e702cb41cd0043015a6e26ddb38073cc6ffeb0ba3e808ba8c097`
+- **哈希算法**：使用 keccak256 对地址进行哈希
+- **证明生成**：每个地址都有唯一的默克尔证明
+- **合约验证**：智能合约通过默克尔根验证证明的有效性
+
+### **13. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -957,7 +1046,7 @@ await publicClient.waitForTransactionReceipt({ hash: hashMint });
 - **函数调用**：ethers.js 用合约实例调用，viem 用 `writeContract`。
 - **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
 
-### **13. 事件查询对比**
+### **14. 事件查询对比**
 
 #### **Ethers.js 版本**
 ```javascript
