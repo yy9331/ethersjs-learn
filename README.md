@@ -40,8 +40,10 @@ etherjs-viem-learn/
 ├── 13_calldata_viem.js                         # Calldata 处理 (viem)
 ├── 14_HDWallet_ethersjs.js                     # HD 钱包 (ethers.js)
 ├── 14_HDWallet_viem.js                         # HD 钱包 (viem)
-├── 15_batchTransfer_ethersjs.js                # 批量转账
-├── 16_batchCollect_ethersjs.js                 # 批量收集
+├── 15_batchTransfer_ethersjs.js                # 批量转账 (ethers.js)
+├── 15_batchTransfer_viem.js                    # 批量转账 (viem) - HD钱包派生20个地址并转账
+├── 16_batchCollect_ethersjs.js                 # 批量收集 (ethers.js)
+├── 16_batchCollect_viem.js                     # 批量收集 (viem) - 检查子钱包余额并归集到主钱包
 ├── 17_MerkleTree_ethersjs.js                   # Merkle 树
 ├── 18_signature_ethersjs.js                    # 签名验证
 ├── 19_mempool_ethersjs.js                      # 内存池
@@ -699,7 +701,196 @@ const recoveredWallet = hdKeyToAccount(hdKey, { path: "m/44'/60'/0'/0/0" });
 - **钱包恢复**：通过助记词和路径可以恢复任意派生钱包。
 - **BIP 标准**：遵循 BIP-32、BIP-39、BIP-44 等标准。
 
-### **9. 合约部署对比**
+### **9. 批量转账对比**
+
+#### **Ethers.js 版本**
+```javascript
+import { ethers } from "ethers";
+
+// 创建HD钱包
+const mnemonic = `air organ twist rule prison symptom jazz cheap rather dizzy verb glare jeans orbit weapon universe require tired sing casino business anxiety seminar hunt`;
+const hdNode = ethers.HDNodeWallet.fromPhrase(mnemonic);
+
+// 派生20个子钱包
+for (let i = 0; i < 20; i++) {
+    const childNode = hdNode.deriveChild(i);
+    addresses.push(childNode.address);
+}
+
+// 批量转账
+for (let i = 0; i < addresses.length; i++) {
+    const tx = await wallet.sendTransaction({
+        to: addresses[i],
+        value: ethers.parseEther("0.0001")
+    });
+    await tx.wait();
+}
+```
+
+#### **Viem 版本**
+```javascript
+import { createPublicClient, createWalletClient, http, parseEther } from "viem";
+import { hdKeyToAccount } from "viem/accounts";
+import { HDKey } from "@scure/bip32";
+
+// 创建HD钱包
+const seed = await mnemonicToSeed(mnemonic);
+const hdKey = HDKey.fromMasterSeed(seed);
+
+// 派生20个子钱包
+for (let i = 0; i < 20; i++) {
+    const derivePath = `m/44'/60'/0'/0/${i}`;
+    const childWallet = hdKeyToAccount(hdKey, { path: derivePath });
+    addresses.push(childWallet.address);
+}
+
+// 批量转账
+for (let i = 0; i < addresses.length; i++) {
+    const hash = await walletClient.sendTransaction({
+        to: addresses[i],
+        value: parseEther("0.0001")
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+}
+```
+
+#### **主要区别说明**
+- **HD 钱包创建**：ethers.js 用 `HDNodeWallet.fromPhrase()`，viem 用 `HDKey.fromMasterSeed()` + `hdKeyToAccount()`。
+- **路径格式**：ethers.js 用 `deriveChild(i)`，viem 用完整路径字符串。
+- **交易发送**：ethers.js 用 `wallet.sendTransaction()`，viem 用 `walletClient.sendTransaction()`。
+- **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt()`。
+- **依赖库**：viem 需要额外的 `@scure/bip32` 和 `@scure/bip39` 库。
+
+### **10. 批量归集对比**
+
+#### **Ethers.js 版本**
+```javascript
+// 检查子钱包余额
+for (let i = 0; i < addresses.length; i++) {
+    const balance = await provider.getBalance(addresses[i]);
+    if (balance > ethers.parseEther("0.0001")) {
+        walletsWithBalance.push({
+            index: i,
+            address: addresses[i],
+            wallet: childWallets[i],
+            balance: balance
+        });
+    }
+}
+
+// 批量归集
+for (let i = 0; i < walletsWithBalance.length; i++) {
+    const childWallet = new ethers.Wallet(childWallets[i].privateKey, provider);
+    const tx = await childWallet.sendTransaction({
+        to: wallet.address,
+        value: transferAmount
+    });
+    await tx.wait();
+}
+```
+
+#### **Viem 版本**
+```javascript
+// 检查子钱包余额
+for (let i = 0; i < addresses.length; i++) {
+    const balance = await publicClient.getBalance({ address: addresses[i] });
+    if (balance > parseEther("0.0001")) {
+        walletsWithBalance.push({
+            index: i,
+            address: addresses[i],
+            wallet: childWallets[i],
+            balance: balance
+        });
+    }
+}
+
+// 批量归集
+for (let i = 0; i < walletsWithBalance.length; i++) {
+    const childWalletClient = createWalletClient({
+        account: childWallet,
+        chain: sepolia,
+        transport: http()
+    });
+    const hash = await childWalletClient.sendTransaction({
+        to: account.address,
+        value: transferAmount
+    });
+    await publicClient.waitForTransactionReceipt({ hash });
+}
+```
+
+#### **主要区别说明**
+- **余额查询**：ethers.js 用 `provider.getBalance(address)`，viem 用 `publicClient.getBalance({ address })`。
+- **子钱包创建**：ethers.js 用 `new ethers.Wallet(privateKey, provider)`，viem 用 `createWalletClient()`。
+- **交易发送**：ethers.js 用 `childWallet.sendTransaction()`，viem 用 `childWalletClient.sendTransaction()`。
+- **错误处理**：viem 提供更详细的错误信息和类型安全。
+
+#### **批量操作的用途与心得**
+
+##### **批量转账应用场景**
+- **空投活动**：向大量用户地址发送代币或 NFT
+- **奖励分发**：向参与者分发奖励
+- **测试网络**：向测试地址分发测试币
+- **多签钱包**：向多个签名者分发资金
+
+##### **批量归集应用场景**
+- **资金整合**：将分散的资金集中到主钱包
+- **账户清理**：清理不再使用的子钱包
+- **安全转移**：将资金从多个地址转移到安全钱包
+- **税务处理**：归集收入用于税务申报
+
+##### **技术要点**
+- **HD 钱包管理**：通过 HD 钱包可以管理多个子钱包，便于批量操作
+- **资金分散**：可以将资金分散到多个地址，提高安全性
+- **Gas 优化**：批量操作可以优化 gas 使用，但需要注意网络拥堵
+- **错误处理**：批量操作需要完善的错误处理机制
+- **余额检查**：归集前需要检查每个钱包的余额和 gas 费用
+- **交易确认**：每个交易都需要等待确认后再进行下一个
+
+### **11. 批量操作功能总结**
+
+#### **15_batchTransfer_viem.js - 批量转账功能**
+**核心功能：** 使用 HD 钱包派生 20 个子钱包，然后从主钱包向每个子钱包转账 0.0001 ETH
+
+**关键步骤：**
+1. 通过助记词创建 HD 钱包
+2. 派生 20 个子钱包地址
+3. 检查主钱包余额是否足够
+4. 循环向每个子钱包转账
+5. 等待每个交易确认
+
+**实际运行结果：**
+- 成功向 20 个地址各转账 0.0001 ETH
+- 所有交易都成功上链确认
+- 总消耗约 0.002 ETH（转账金额 + gas 费用）
+
+#### **16_batchCollect_viem.js - 批量归集功能**
+**核心功能：** 检查所有子钱包余额，将有余额的钱包中的 ETH 归集到主钱包
+
+**关键步骤：**
+1. 通过助记词创建 HD 钱包
+2. 派生 20 个子钱包地址
+3. 检查每个子钱包的余额
+4. 筛选出有足够余额的钱包（> 0.0001 ETH）
+5. 计算转账金额（余额 - gas 费用）
+6. 从子钱包向主钱包转账
+
+**实际运行结果：**
+- 检测到所有子钱包都有 0.0001 ETH
+- 但由于余额等于最小归集阈值，没有进行归集
+- 这是正常行为，因为需要保留 gas 费用
+
+#### **两个版本的主要区别**
+| 功能 | Ethers.js 版本 | Viem 版本 |
+|------|----------------|-----------|
+| **HD 钱包创建** | `HDNodeWallet.fromPhrase()` | `HDKey.fromMasterSeed()` + `hdKeyToAccount()` |
+| **路径格式** | `deriveChild(i)` | 完整路径字符串 |
+| **交易发送** | `wallet.sendTransaction()` | `walletClient.sendTransaction()` |
+| **交易等待** | `tx.wait()` | `waitForTransactionReceipt()` |
+| **余额查询** | `provider.getBalance()` | `publicClient.getBalance()` |
+| **子钱包创建** | `new ethers.Wallet()` | `createWalletClient()` |
+
+### **12. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -766,7 +957,7 @@ await publicClient.waitForTransactionReceipt({ hash: hashMint });
 - **函数调用**：ethers.js 用合约实例调用，viem 用 `writeContract`。
 - **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
 
-### **9. 事件查询对比**
+### **13. 事件查询对比**
 
 #### **Ethers.js 版本**
 ```javascript
