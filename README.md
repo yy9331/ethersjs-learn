@@ -38,7 +38,8 @@ etherjs-viem-learn/
 ├── 12_ERC721Check_viem.js                      # ERC721 检查 (viem)
 ├── 13_calldata_ethersjs.js                     # Calldata 处理
 ├── 13_calldata_viem.js                         # Calldata 处理 (viem)
-├── 14_HDWallet_ethersjs.js                     # HD 钱包
+├── 14_HDWallet_ethersjs.js                     # HD 钱包 (ethers.js)
+├── 14_HDWallet_viem.js                         # HD 钱包 (viem)
 ├── 15_batchTransfer_ethersjs.js                # 批量转账
 ├── 16_batchCollect_ethersjs.js                 # 批量收集
 ├── 17_MerkleTree_ethersjs.js                   # Merkle 树
@@ -559,7 +560,146 @@ const receipt = await publicClient.waitForTransactionReceipt({ hash });
 - **Gas 优化**：手动编码可以优化 gas 使用。
 - **跨链兼容**：calldata 格式在不同链上是通用的。
 
-### **8. 合约部署对比**
+### **8. HD Wallet 对比**
+
+#### **Ethers.js 版本**
+```javascript
+import { ethers } from "ethers";
+
+// 生成随机助记词
+const mnemonic = ethers.Mnemonic.entropyToPhrase(ethers.randomBytes(32));
+
+// 创建HD基钱包
+const basePath = "44'/60'/0'/0";
+const baseWallet = ethers.HDNodeWallet.fromPhrase(mnemonic, basePath);
+
+// 派生20个钱包
+for (let i = 0; i < 20; i++) {
+    let derivedWallet = baseWallet.derivePath(i.toString());
+    console.log(`第${i+1}个钱包地址： ${derivedWallet.address}`);
+}
+
+// 保存钱包（加密json）
+const wallet = ethers.Wallet.fromPhrase(mnemonic);
+const json = await wallet.encrypt("password");
+```
+
+#### **Viem 版本**
+```javascript
+import { generateMnemonic, mnemonicToAccount, hdKeyToAccount } from "viem/accounts";
+import { HDKey } from "@scure/bip32";
+import { mnemonicToSeed } from "@scure/bip39";
+
+// 生成随机助记词
+const mnemonic = generateMnemonic(wordlist);
+
+// 创建HD基钱包
+const basePath = "m/44'/60'/0'/0";
+const seed = await mnemonicToSeed(mnemonic);
+const hdKey = HDKey.fromMasterSeed(seed);
+
+// 派生20个钱包
+for (let i = 0; i < 20; i++) {
+    const derivePath = `${basePath}/${i}`;
+    const derivedWallet = hdKeyToAccount(hdKey, { path: derivePath });
+    console.log(`第${i+1}个钱包地址： ${derivedWallet.address}`);
+}
+
+// 从助记词创建钱包
+const wallet = mnemonicToAccount(mnemonic);
+```
+
+#### **主要区别说明**
+- **助记词生成**：ethers.js 用 `Mnemonic.entropyToPhrase()`，viem 用 `generateMnemonic()`。
+- **HD 钱包创建**：ethers.js 用 `HDNodeWallet.fromPhrase()`，viem 用 `HDKey.fromMasterSeed()` + `hdKeyToAccount()`。
+- **路径格式**：ethers.js 用 `44'/60'/0'/0`，viem 用 `m/44'/60'/0'/0`。
+- **钱包派生**：ethers.js 用 `derivePath()`，viem 用 `hdKeyToAccount()` + 路径参数。
+- **加密存储**：ethers.js 内置 `encrypt()` 方法，viem 需要第三方库。
+- **依赖库**：viem 需要额外的 `@scure/bip32` 和 `@scure/bip39` 库。
+
+#### **HD Wallet 的用途与心得**
+
+##### **分层结构说明**
+```
+m / 44' / 60' / 0' / 0 / 0
+│   │    │    │   │  │  └── 地址索引 (0, 1, 2, ...)
+│   │    │    │   │  └───── 外部/内部链 (0=外部, 1=内部)
+│   │    │    │   └──────── 账户索引 (0, 1, 2, ...)
+│   │    │    └──────────── 币种类型 (60=ETH, 0=BTC, ...)
+│   │    └───────────────── 用途 (44=BIP44, 49=BIP49, ...)
+│   └────────────────────── 主密钥
+```
+
+##### **多账户管理示例**
+```javascript
+// 为不同用途创建不同路径的钱包
+const tradingWallet = hdKeyToAccount(hdKey, { path: "m/44'/60'/0'/0/0" });    // 交易钱包
+const savingsWallet = hdKeyToAccount(hdKey, { path: "m/44'/60'/1'/0/0" });     // 储蓄钱包
+const stakingWallet = hdKeyToAccount(hdKey, { path: "m/44'/60'/2'/0/0" });     // 质押钱包
+const defiWallet = hdKeyToAccount(hdKey, { path: "m/44'/60'/3'/0/0" });        // DeFi 钱包
+
+// 批量生成同一账户下的多个地址
+for (let i = 0; i < 5; i++) {
+    const address = hdKeyToAccount(hdKey, { path: `m/44'/60'/0'/0/${i}` });
+    console.log(`交易地址 ${i}: ${address.address}`);
+}
+```
+
+##### **路径详解**
+| 路径组件 | 说明 | 示例值 |
+|---------|------|--------|
+| `m` | 主密钥标识符 | 固定值 |
+| `44'` | BIP44 用途 | 44 (BIP44), 49 (BIP49), 84 (BIP84) |
+| `60'` | 币种类型 | 60 (ETH), 0 (BTC), 3 (LTC) |
+| `0'` | 账户索引 | 0 (第一个账户), 1 (第二个账户) |
+| `0` | 外部/内部链 | 0 (外部地址), 1 (内部地址) |
+| `0` | 地址索引 | 0, 1, 2, ... (同一链下的地址) |
+
+##### **实际应用场景**
+
+###### **1. 多用途钱包管理**
+```javascript
+// 不同用途的钱包路径
+const wallets = {
+    trading: "m/44'/60'/0'/0/0",      // 日常交易
+    savings: "m/44'/60'/1'/0/0",      // 长期储蓄
+    staking: "m/44'/60'/2'/0/0",      // 质押收益
+    defi: "m/44'/60'/3'/0/0",         // DeFi 操作
+    nft: "m/44'/60'/4'/0/0",          // NFT 收藏
+    gaming: "m/44'/60'/5'/0/0"        // 游戏资产
+};
+```
+
+###### **2. 批量地址生成**
+```javascript
+// 为交易所生成多个充值地址
+const exchangeAddresses = [];
+for (let i = 0; i < 10; i++) {
+    const wallet = hdKeyToAccount(hdKey, { path: `m/44'/60'/0'/0/${i}` });
+    exchangeAddresses.push(wallet.address);
+}
+```
+
+###### **3. 钱包恢复流程**
+```javascript
+// 从助记词恢复所有钱包
+const mnemonic = "your twelve word seed phrase here";
+const seed = await mnemonicToSeed(mnemonic);
+const hdKey = HDKey.fromMasterSeed(seed);
+
+// 恢复特定路径的钱包
+const recoveredWallet = hdKeyToAccount(hdKey, { path: "m/44'/60'/0'/0/0" });
+```
+
+###### **4. 安全最佳实践**
+- **确定性钱包**：从一个种子（助记词）可以生成无限个钱包地址。
+- **安全备份**：只需要备份一个助记词，就能恢复所有钱包。
+- **分层结构**：使用路径系统组织钱包，如 `m/44'/60'/0'/0/0`。
+- **多账户管理**：可以为不同用途创建不同的钱包路径。
+- **钱包恢复**：通过助记词和路径可以恢复任意派生钱包。
+- **BIP 标准**：遵循 BIP-32、BIP-39、BIP-44 等标准。
+
+### **9. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -697,37 +837,37 @@ console.log(`地址 ${from} 转账${amount} WETH 到地址 ${to}`);
 
 #### **Ethers.js 版本**
 ```javascript
-// 1. 监听一次事件
-contract.once('Transfer', (from, to, value) => {
+    // 1. 监听一次事件
+    contract.once('Transfer', (from, to, value) => {
     console.log(`监听到一次 Transfer 事件: ${from} -> ${to} ${ethers.formatUnits(value, 6)} USDT`);
-});
-
-// 2. 持续监听事件
-contract.on('Transfer', (from, to, value) => {
+    });
+    
+    // 2. 持续监听事件
+    contract.on('Transfer', (from, to, value) => {
     console.log(`监听到 Transfer 事件: ${from} -> ${to} ${ethers.formatUnits(value, 6)} USDT`);
-});
+    });
 ```
 
 #### **Viem 版本**
 ```javascript
 // 使用轮询方式模拟实时监听
-const pollEvents = async () => {
-    const events = await publicClient.getLogs({
-        address: contractAddressUSDT,
-        event: transferEvent,
-        fromBlock: BigInt(lastProcessedBlock + 1),
-        toBlock: currentBlock
-    });
-    
+        const pollEvents = async () => {
+                    const events = await publicClient.getLogs({
+                        address: contractAddressUSDT,
+                        event: transferEvent,
+                        fromBlock: BigInt(lastProcessedBlock + 1),
+                        toBlock: currentBlock
+                    });
+                    
     events.forEach((log) => {
-        const from = '0x' + log.topics[1].slice(26);
-        const to = '0x' + log.topics[2].slice(26);
-        const value = formatUnits(log.data, 6);
+                            const from = '0x' + log.topics[1].slice(26);
+                            const to = '0x' + log.topics[2].slice(26);
+                            const value = formatUnits(log.data, 6);
         console.log(`${from} -> ${to} ${value} USDT`);
-    });
-};
-
-const pollInterval = setInterval(pollEvents, 5000);
+                        });
+        };
+        
+        const pollInterval = setInterval(pollEvents, 5000);
 ```
 
 #### **主要区别说明**
