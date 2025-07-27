@@ -26,10 +26,12 @@ etherjs-viem-learn/
 ├── 6_bytecode_ethersjs.js                      # 字节码处理
 ├── 7_events_ethersjs.js                        # 事件监听
 ├── 7_events_viem.js                            # 事件监听 (viem)
-├── 8_events_listener_ethersjs.js               # 事件监听器
-├── 8_events_listener_viem.js                   # 事件监听器 (viem)
-├── 9_events_filter_ethersjs.js                 # 事件过滤
-├── 9_events_filter_viem.js                     # 事件过滤 (viem)
+├── 8_events_listener_ethersjs.js               # 事件监听器 (ethers.js)
+├── 8_events_listener_viem.js                   # 事件监听器 (viem) - 轮询版本
+├── 8_events_listener_viem_websocket.js         # 事件监听器 (viem) - WebSocket 版本
+├── 9_events_filter_ethersjs.js                 # 事件过滤 (ethers.js)
+├── 9_events_filter_viem.js                     # 事件过滤 (viem) - 轮询版本
+├── 9_events_filter_viem_websocket.js           # 事件过滤 (viem) - WebSocket 版本
 ├── 10_bignumber_ethersjs.js                    # 大数处理
 ├── 10_bignumber_viem.js                        # 大数处理 (viem)
 ├── 11_static_call_ethersjs.js                  # 静态调用
@@ -1642,7 +1644,7 @@ console.log(`地址 ${from} 转账${amount} WETH 到地址 ${to}`);
     });
 ```
 
-#### **Viem 版本**
+#### **Viem 轮询版本**
 ```javascript
 // 使用轮询方式模拟实时监听
         const pollEvents = async () => {
@@ -1664,13 +1666,137 @@ console.log(`地址 ${from} 转账${amount} WETH 到地址 ${to}`);
         const pollInterval = setInterval(pollEvents, 5000);
 ```
 
+#### **Viem WebSocket 版本**
+```javascript
+// 使用 WebSocket 实现真正的实时监听
+const publicClient = createPublicClient({
+    chain: mainnet,
+    transport: webSocket(process.env.MAINNET_WSSURL)
+});
+
+const unwatch = publicClient.watchContractEvent({
+    address: contractAddressUSDT,
+    event: transferEvent,
+    onLogs: (logs) => {
+        console.log(`监听到 ${logs.length} 个新的 Transfer 事件:`);
+        logs.forEach((log, index) => {
+            const from = '0x' + log.topics[1].slice(26);
+            const to = '0x' + log.topics[2].slice(26);
+            const value = formatUnits(log.data, 6);
+            console.log(`${index + 1}. ${from} -> ${to} ${value} USDT`);
+        });
+    },
+    onError: (error) => {
+        console.error("WebSocket 监听错误:", error);
+    }
+});
+```
+
 #### **主要区别说明**
-- **实时监听**：ethers.js 支持真正的实时监听，viem 需要轮询模拟。
+- **实时监听**：ethers.js 支持真正的实时监听，viem 轮询版本需要模拟，WebSocket 版本支持真正的实时监听。
 - **事件处理**：ethers.js 自动解析事件参数，viem 需要手动解析 `topics` 和 `data`。
-- **连接方式**：ethers.js 用 `contract.on()` 和 `contract.once()`，viem 用 `setInterval` + `getLogs()`。
-- **错误处理**：ethers.js 内置错误处理，viem 需要手动处理轮询错误。
-- **RPC 支持**：ethers.js 支持 HTTP 和 WebSocket，viem 主要支持 HTTP。
+- **连接方式**：ethers.js 用 `contract.on()` 和 `contract.once()`，viem 轮询版本用 `setInterval` + `getLogs()`，WebSocket 版本用 `watchContractEvent()`。
+- **错误处理**：ethers.js 内置错误处理，viem WebSocket 版本提供更好的错误处理和重连机制。
+- **RPC 支持**：ethers.js 支持 HTTP 和 WebSocket，viem 轮询版本主要支持 HTTP，WebSocket 版本需要 WebSocket RPC。
 - **类型安全**：viem 需要明确的 BigInt 类型转换，ethers.js 自动处理。
+- **性能**：WebSocket 版本比轮询版本更高效，减少不必要的网络请求。
+
+### **11. 事件过滤对比**
+
+#### **Ethers.js 版本**
+```javascript
+// 创建过滤器，监听转入交易所
+const filterIn = contract.filters.Transfer(null, accountBinance);
+contract.on(filterIn, (from, to, value) => {
+    console.log(`USDT 转入交易所: ${from} -> ${to} ${ethers.formatUnits(value, 6)} USDT`);
+});
+
+// 创建过滤器，监听转出交易所
+const filterOut = contract.filters.Transfer(accountBinance, null);
+contract.on(filterOut, (from, to, value) => {
+    console.log(`USDT 转出交易所: ${from} -> ${to} ${ethers.formatUnits(value, 6)} USDT`);
+});
+```
+
+#### **Viem 轮询版本**
+```javascript
+// 使用轮询方式模拟实时监听
+const pollBinanceInEvents = async () => {
+    const events = await publicClient.getLogs({
+        address: contractAddressUSDT,
+        event: transferEvent,
+        args: {
+            to: accountBinance
+        },
+        fromBlock: lastProcessedBlock + 1n,
+        toBlock: currentBlock
+    });
+    
+    events.forEach((log) => {
+        const from = '0x' + log.topics[1].slice(26);
+        const to = '0x' + log.topics[2].slice(26);
+        const value = formatUnits(log.data, 6);
+        console.log(`${from} -> ${to} ${value} USDT`);
+    });
+};
+
+const pollInInterval = setInterval(pollBinanceInEvents, 5000);
+```
+
+#### **Viem WebSocket 版本**
+```javascript
+// 使用 WebSocket 实现真正的实时监听
+const unwatchIn = publicClient.watchContractEvent({
+    address: contractAddressUSDT,
+    event: transferEvent,
+    args: {
+        to: accountBinance // 只监听转入币安热钱包的事件
+    },
+    onLogs: (logs) => {
+        if (logs.length > 0) {
+            console.log('---------监听USDT进入交易所--------');
+            logs.forEach((log, index) => {
+                const from = '0x' + log.topics[1].slice(26);
+                const to = '0x' + log.topics[2].slice(26);
+                const value = formatUnits(log.data, 6);
+                console.log(`${index + 1}. ${from} -> ${to} ${value} USDT`);
+            });
+        }
+    },
+    onError: (error) => {
+        console.error("转入事件监听错误:", error);
+    }
+});
+
+const unwatchOut = publicClient.watchContractEvent({
+    address: contractAddressUSDT,
+    event: transferEvent,
+    args: {
+        from: accountBinance // 只监听转出币安热钱包的事件
+    },
+    onLogs: (logs) => {
+        if (logs.length > 0) {
+            console.log('---------监听USDT转出交易所--------');
+            logs.forEach((log, index) => {
+                const from = '0x' + log.topics[1].slice(26);
+                const to = '0x' + log.topics[2].slice(26);
+                const value = formatUnits(log.data, 6);
+                console.log(`${index + 1}. ${from} -> ${to} ${value} USDT`);
+            });
+        }
+    },
+    onError: (error) => {
+        console.error("转出事件监听错误:", error);
+    }
+});
+```
+
+#### **主要区别说明**
+- **实时监听**：ethers.js 支持真正的实时监听，viem 轮询版本需要模拟，WebSocket 版本支持真正的实时监听。
+- **事件过滤**：ethers.js 用 `contract.filters.Transfer()`，viem 用 `args` 参数过滤。
+- **连接方式**：ethers.js 用 `contract.on()`，viem 轮询版本用 `setInterval` + `getLogs()`，WebSocket 版本用 `watchContractEvent()`。
+- **错误处理**：ethers.js 内置错误处理，viem WebSocket 版本提供更好的错误处理和重连机制。
+- **性能**：WebSocket 版本比轮询版本更高效，减少不必要的网络请求。
 
 ### **Viem 事件监听限制说明**
 
@@ -1700,25 +1826,67 @@ console.log(`地址 ${from} 转账${amount} WETH 到地址 ${to}`);
 2. **需要付费服务**：WebSocket 支持通常需要 Alchemy、Infura 等付费服务
 3. **连接不稳定**：免费 WebSocket 服务经常断连
 4. **配置复杂**：需要正确的 API Key 和 WebSocket URL
+5. **网络问题**：可能遇到连接超时或防火墙阻止
+
+#### **WebSocket 连接问题排查**
+
+如果遇到 WebSocket 连接问题，可以按以下步骤排查：
+
+1. **检查网络连接**：
+   ```bash
+   ping mainnet.infura.io
+   ```
+
+2. **验证 API Key**：
+   - 登录 Infura/Alchemy 控制台
+   - 确认 API Key 有效且未过期
+   - 检查是否有使用限制
+
+3. **测试连接**：
+   ```bash
+   node test_websocket_connection.js
+   ```
+
+4. **使用 HTTP 版本**：
+   - 如果 WebSocket 不可用，使用轮询版本
+   - `node 8_events_listener_viem.js`
+   - `node 9_events_filter_viem.js`
 
 #### **推荐方案**
 
 **开发环境：**
-- 使用轮询方案（`9_events_filter_viem.js`）
+- 使用轮询方案（`8_events_listener_viem.js`、`9_events_filter_viem.js`）
 - 免费 RPC 即可满足需求
 - 简单可靠，易于调试
 
 **生产环境：**
+- 使用 WebSocket 方案（`8_events_listener_viem_websocket.js`、`9_events_filter_viem_websocket.js`）
+- 需要付费 WebSocket RPC 服务（如 Alchemy、Infura）
+- 真正的实时监听，性能更好
+
+**测试环境：**
 - 使用 ethers.js 的 HTTP 监听方案
-- 或者使用付费 WebSocket 服务
 - 或者继续使用轮询方案
 
-#### **为什么选择轮询方案**
+#### **WebSocket vs 轮询对比**
 
-1. **免费 RPC 支持**：所有免费 RPC 都支持 HTTP
-2. **简单可靠**：无需复杂的 WebSocket 配置
-3. **易于调试**：可以清楚地看到每个请求和响应
-4. **兼容性好**：在所有环境下都能工作
+| 特性 | WebSocket 版本 | 轮询版本 |
+|------|----------------|----------|
+| **实时性** | ✅ 真正的实时监听 | ⚠️ 有延迟（5秒间隔） |
+| **网络效率** | ✅ 高效，减少请求 | ❌ 频繁请求 |
+| **RPC 要求** | ❌ 需要 WebSocket RPC | ✅ 支持 HTTP RPC |
+| **成本** | ❌ 需要付费服务 | ✅ 免费 RPC 即可 |
+| **稳定性** | ⚠️ 依赖连接稳定性 | ✅ 简单可靠 |
+| **调试难度** | ⚠️ 较复杂 | ✅ 易于调试 |
+
+#### **选择建议**
+
+1. **免费 RPC 支持**：轮询版本支持所有免费 RPC
+2. **简单可靠**：轮询版本无需复杂的 WebSocket 配置
+3. **易于调试**：轮询版本可以清楚地看到每个请求和响应
+4. **兼容性好**：轮询版本在所有环境下都能工作
+5. **性能优先**：WebSocket 版本提供真正的实时监听
+6. **生产环境**：WebSocket 版本更适合生产环境
 
 ## 📈 性能测试结果
 

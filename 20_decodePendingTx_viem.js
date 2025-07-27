@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, webSocket, parseAbiItem, decodeFunctionData } from "viem";
+import { createPublicClient, webSocket, parseAbiItem, decodeFunctionData } from "viem";
 import { sepolia } from "viem/chains";
 import dotenv from "dotenv";
 dotenv.config();
