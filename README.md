@@ -52,9 +52,12 @@ etherjs-viem-learn/
 ├── 20_decodePendingTx_ethersjs.js              # 解码待处理交易 (ethers.js)
 ├── 20_decodePendingTx_viem.js                  # 解码待处理交易 (viem)
 ├── 21_VanityAddr_ethersjs.js                   # 靓号地址
-├── 22_provider_wallet_connector_read_only_ethersjs.html      # Provider 钱包连接器
-├── 22_signer_wallet_connector_can_send_receive_ethersjs.html # Signer 钱包连接器
-├── 23_signer_wallet_connector_react_ethersjs.html           # React 钱包连接器
+├── 22_provider_wallet_connector_read_only_ethersjs.html      # Provider 钱包连接器 (ethers.js)
+├── 22_provider_wallet_connector_read_only_viem.html          # Provider 钱包连接器 (viem)
+├── 22_signer_wallet_connector_can_send_receive_ethersjs.html # Signer 钱包连接器 (ethers.js)
+├── 22_signer_wallet_connector_can_send_receive_viem.html     # Signer 钱包连接器 (viem)
+├── 23_signer_wallet_connector_react_ethersjs.html           # React 钱包连接器 (ethers.js)
+├── 23_signer_wallet_connector_react_viem.html               # React 钱包连接器 (viem)
 ├── convert_abi.js                               # ABI 转换工具
 ├── extra_VerifyWETHAddress.js                   # WETH 地址验证
 ├── extra_WETHCompleteDemo.js                    # WETH 完整演示
@@ -1114,6 +1117,291 @@ publicClient.watchPendingTransactions({
 - **交易解码**：使用 decodeFunctionData 解码交易数据
 - **选择器匹配**：使用 startsWith 匹配函数选择器
 
+### **15. 钱包连接器对比**
+
+#### **Provider 只读连接 (Ethers.js)**
+```javascript
+// 创建 BrowserProvider
+const provider = new ethers.BrowserProvider(window.ethereum);
+
+// 获取账户
+const accounts = await provider.send("eth_requestAccounts", []);
+const account = accounts[0];
+
+// 获取网络信息
+const { chainId } = await provider.getNetwork();
+
+// 获取余额
+const balance = await provider.getBalance(account);
+const formattedBalance = ethers.formatUnits(balance);
+```
+
+#### **Provider 只读连接 (Viem)**
+```javascript
+// 创建客户端
+const publicClient = createPublicClient({
+    chain: mainnet,
+    transport: custom(window.ethereum)
+});
+
+const walletClient = createWalletClient({
+    chain: mainnet,
+    transport: custom(window.ethereum)
+});
+
+// 获取账户
+const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+const account = accounts[0];
+
+// 获取网络信息
+const chainId = await publicClient.getChainId();
+
+// 获取余额
+const balance = await publicClient.getBalance({ address: account });
+const formattedBalance = Number(balance) / 10**18;
+```
+
+#### **Signer 可写连接 (Ethers.js)**
+```javascript
+// 获取 Signer
+const signer = await provider.getSigner();
+
+// 签名消息
+const signature = await signer.signMessage(message);
+
+// 验证签名
+const recoveredAddress = ethers.verifyMessage(message, signature);
+```
+
+#### **Signer 可写连接 (Viem)**
+```javascript
+// 签名消息
+const signature = await walletClient.signMessage({ 
+    message: message,
+    account: account
+});
+
+// 验证签名
+const recoveredAddress = await recoverMessageAddress({
+    message: message,
+    signature: signature
+});
+```
+
+#### **主要区别说明**
+- **客户端创建**：ethers.js 用 `BrowserProvider`，viem 用 `createPublicClient` 和 `createWalletClient`
+- **账户获取**：ethers.js 用 `provider.send("eth_requestAccounts")`，viem 用 `window.ethereum.request({ method: 'eth_requestAccounts' })`
+- **网络获取**：ethers.js 用 `provider.getNetwork()`，viem 用 `publicClient.getChainId()`
+- **余额获取**：ethers.js 用 `provider.getBalance()`，viem 用 `publicClient.getBalance({ address })`
+- **消息签名**：ethers.js 用 `signer.signMessage()`，viem 用 `walletClient.signMessage({ message, account })`
+- **签名验证**：ethers.js 用 `ethers.verifyMessage()`，viem 用 `recoverMessageAddress()`
+- **导入方式**：ethers.js 支持 UMD/CDN 或 ES 模块，viem 推荐使用 ES 模块或混合导入方案
+
+#### **钱包连接器的用途与心得**
+- **只读操作**：Provider 连接用于查询区块链状态，如余额、网络信息等
+- **可写操作**：Signer 连接用于签名和发送交易
+- **用户认证**：通过签名验证用户身份，实现 Web3 登录
+- **交易签名**：用户对交易进行签名，确保交易的安全性
+- **防重放攻击**：使用 nonce 或时间戳防止签名被重复使用
+- **离线签名**：可以在离线环境下生成签名，提高安全性
+
+#### **实际运行结果**
+- **连接成功**：✅ 成功连接到 MetaMask 钱包
+- **账户获取**：✅ 成功获取用户钱包地址
+- **网络信息**：✅ 成功获取当前网络 Chain ID
+- **余额查询**：✅ 成功获取 ETH 余额
+- **消息签名**：✅ 成功对消息进行签名
+- **签名验证**：✅ 成功验证签名有效性
+
+#### **修复过程总结**
+
+在调试 Viem 钱包连接器的过程中，我们遇到了多个 API 使用问题，以下是详细的修复过程：
+
+##### **1. 导入问题修复**
+**问题**：`getBalance` 和 `getNetwork` 不是 viem 的直接导出
+```javascript
+// ❌ 错误：直接导入不存在的函数
+import { getBalance, getNetwork } from "viem";
+
+// ✅ 正确：这些是客户端的方法
+const balance = await publicClient.getBalance({ address });
+const chainId = await publicClient.getChainId();
+```
+
+##### **2. 账户获取修复**
+**问题**：`walletClient.requestAccounts()` 方法不存在
+```javascript
+// ❌ 错误：方法不存在
+const accounts = await walletClient.requestAccounts();
+
+// ✅ 正确：使用 MetaMask 的 RPC 方法
+const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+```
+
+##### **3. 网络信息获取修复**
+**问题**：`publicClient.getNetwork()` 方法不存在
+```javascript
+// ❌ 错误：方法不存在
+const network = await publicClient.getNetwork();
+
+// ✅ 正确：使用 getChainId 获取网络信息
+const chainId = await publicClient.getChainId();
+```
+
+##### **4. 余额获取修复**
+**问题**：`getBalance` 参数格式错误
+```javascript
+// ❌ 错误：参数格式不正确
+const balance = await getBalance(publicClient, { address });
+
+// ✅ 正确：作为客户端方法调用
+const balance = await publicClient.getBalance({ address });
+```
+
+##### **5. 消息签名修复**
+**问题**：`signMessage` 缺少必需的 `account` 参数
+```javascript
+// ❌ 错误：缺少 account 参数
+const signature = await walletClient.signMessage({ message });
+
+// ✅ 正确：提供 account 参数
+const signature = await walletClient.signMessage({ 
+    message: message,
+    account: account 
+});
+```
+
+##### **6. 签名验证修复**
+**问题**：`verifyMessage` 返回 Promise 且参数格式不正确
+```javascript
+// ❌ 错误：参数格式和返回值问题
+const recoveredAddress = verifyMessage(message, signature);
+
+// ✅ 正确：使用 recoverMessageAddress
+const recoveredAddress = await recoverMessageAddress({
+    message: message,
+    signature: signature
+});
+```
+
+##### **7. React 组件导入修复**
+**问题**：React 组件无法直接使用 ES 模块导入
+```javascript
+// ❌ 错误：在 <script type="text/babel"> 中无法使用 import
+import { createPublicClient } from "viem";
+
+// ✅ 正确：使用混合导入方案
+const { createPublicClient } = window.viem;
+```
+
+##### **8. 模块加载顺序修复**
+**问题**：React 组件在 viem 加载完成前就尝试使用
+```javascript
+// ❌ 错误：没有等待 viem 加载
+const publicClient = createPublicClient({...});
+
+// ✅ 正确：确保 viem 已加载
+if (!window.viem) {
+    setError('Viem 模块加载中，请稍后再试...');
+    return;
+}
+```
+
+##### **关键学习点**
+
+1. **API 设计差异**：
+   - Viem 采用函数式编程风格，很多功能是客户端的方法
+   - Ethers.js 采用面向对象风格，功能是实例的方法
+
+2. **错误处理重要性**：
+   - 每个修复都涉及详细的错误处理
+   - 用户友好的错误信息对调试至关重要
+
+3. **版本兼容性**：
+   - 使用最新版本的 viem (2.33.1)
+   - 避免使用过时的 bundle 版本
+
+4. **模块加载策略**：
+   - ES 模块是现代标准，但需要正确的加载策略
+   - React 组件需要特殊的导入处理
+
+5. **调试技巧**：
+   - 使用浏览器控制台查看详细错误信息
+   - 逐步测试每个 API 调用
+   - 对比 ethers.js 和 viem 的 API 差异
+
+#### **技术要点**
+- **CDN 引入**：使用 ES6 模块从 CDN 引入 viem 库
+- **客户端分离**：publicClient 用于只读操作，walletClient 用于签名操作
+- **错误处理**：完善的错误处理机制，包括 MetaMask 未安装、用户拒绝等
+- **协议检测**：检测 file:// 协议，提示用户使用 Live Server
+- **状态管理**：React 版本使用 useState 管理连接状态
+
+#### **Viem 钱包连接器修复要点**
+- **账户获取**：使用 `window.ethereum.request({ method: 'eth_requestAccounts' })` 而不是 `walletClient.requestAccounts()`
+- **网络获取**：使用 `publicClient.getChainId()` 而不是 `getNetwork(publicClient)`
+- **余额获取**：使用 `publicClient.getBalance({ address })` 而不是 `getBalance(publicClient, { address })`
+- **消息签名**：需要提供 `account` 参数：`walletClient.signMessage({ message, account })`
+- **签名验证**：使用 `recoverMessageAddress()` 而不是 `verifyMessage()`
+- **导入方式**：使用 ES6 模块导入，而不是 UMD 方式
+
+#### **混合导入方案的优势**
+在 `23_signer_wallet_connector_react_viem.html` 中，因为 viem 还没有发布 UMD 版本, 具体可以参考 [Viem GitHub 的 Discussins](https://github.com/wevm/viem/discussions/384), 所以浏览器端我们暂时采用了混合导入方案：
+
+```html
+<!-- Viem ES Module Import -->
+<script type="module">
+  import { createPublicClient, createWalletClient, custom } from "https://cdn.jsdelivr.net/npm/viem@2.33.1/+esm";
+  import { mainnet } from "https://cdn.jsdelivr.net/npm/viem@2.33.1/chains/+esm";
+  
+  // 将 viem 函数暴露到全局作用域
+  window.viem = { createPublicClient, createWalletClient, custom, mainnet };
+</script>
+
+<!-- React 组件使用全局 viem -->
+<script type="text/babel">
+  const { createPublicClient, createWalletClient, custom, mainnet } = window.viem;
+  // React 组件代码...
+</script>
+```
+
+**为什么采用这种方案？**
+
+1. **ES 模块优势**：
+   - 使用最新的 ES6 模块语法
+   - 与 `22_signer_wallet_connector_can_send_receive_viem.html` 保持一致的导入方式
+   - 支持 tree-shaking，减少包体积
+
+2. **React 兼容性**：
+   - React 组件需要 Babel 编译 JSX
+   - `<script type="module">` 不能直接使用 JSX
+   - 通过全局作用域共享，让 React 组件可以访问 viem 函数
+
+3. **加载顺序**：
+   - ES 模块脚本先执行，将 viem 函数暴露到全局
+   - React 组件脚本后执行，从全局作用域获取 viem 函数
+   - 确保 React 组件运行时 viem 已经加载完成
+
+4. **错误处理**：
+   - 如果 viem 加载失败，React 组件会优雅降级
+   - 用户可以看到明确的错误信息
+   - 不会导致整个页面崩溃
+
+**与其他方案的对比**：
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| **混合导入** | ✅ ES 模块语法<br>✅ React 兼容<br>✅ 错误处理好 | ⚠️ 需要全局作用域 |
+| **动态导入** | ✅ 异步加载<br>✅ 按需加载 | ❌ 代码复杂<br>❌ 错误处理复杂 |
+| **UMD 导入** | ✅ 简单直接 | ❌ viem 不提供 UMD<br>❌ 版本过时 |
+| **Bundle 导入** | ✅ 单文件加载 | ❌ 版本可能过时<br>❌ 功能可能不完整 |
+
+**最佳实践建议**：
+- 对于简单的 HTML 页面，直接使用 ES 模块导入
+- 对于 React 组件，使用混合导入方案
+- 对于生产环境，考虑使用构建工具（如 Vite、Webpack）
+- 始终使用最新版本的 viem，避免使用过时的 bundle 版本
+
 #### **签名验证的用途与心得**
 - **身份验证**：通过签名验证用户身份，确保只有授权用户可以铸造。
 - **防重放攻击**：使用 nonce 或时间戳防止签名被重复使用。
@@ -1137,7 +1425,7 @@ publicClient.watchPendingTransactions({
 - **权限验证**：验证当前钱包是否为合约所有者
 - **错误处理**：完善的错误处理机制，包括网络、合约和签名错误
 
-### **15. 合约部署对比**
+### **16. 合约部署对比**
 
 #### **Ethers.js 版本**
 ```javascript
@@ -1204,7 +1492,7 @@ await publicClient.waitForTransactionReceipt({ hash: hashMint });
 - **函数调用**：ethers.js 用合约实例调用，viem 用 `writeContract`。
 - **交易等待**：ethers.js 用 `tx.wait()`，viem 用 `waitForTransactionReceipt`。
 
-### **16. 事件查询对比**
+### **17. 事件查询对比**
 
 #### **Ethers.js 版本**
 ```javascript

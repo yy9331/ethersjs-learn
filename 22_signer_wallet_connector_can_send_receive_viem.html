@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+<h1 id="header">Sign in with Ethereum (Viem)</h1>
+<button class="sign">Sign</button>
+<button class="disconnect">Disconnect</button>
+<h2>钱包地址: <span class="showAccount"></span></h2>
+<h2>Nonce: <span class="showNonce"></span></h2>
+<h2>Signature: <span class="showSignature"></span></h2>
+<h2>是否签名成功: <span class="showSignStatus"></span></h2>
+
+<script type="module">
+    // Provider：只读连接，可以查询区块链状态
+    // Signer：可写连接，可以进行签名和发送交易
+    import { createPublicClient, createWalletClient, custom, recoverMessageAddress } from "https://cdn.jsdelivr.net/npm/viem@2.33.1/+esm";
+    import { mainnet } from "https://cdn.jsdelivr.net/npm/viem@2.33.1/chains/+esm";
+    
+    const signButton = document.querySelector('.sign');
+    const disconnectButton = document.querySelector('.disconnect');
+    const showAccount = document.querySelector('.showAccount');
+    const showNonce = document.querySelector('.showNonce');
+    const showSignature = document.querySelector('.showSignature');
+    const showSignStatus = document.querySelector('.showSignStatus');
+
+    signButton.addEventListener(`click`, onClickHandler)
+    disconnectButton.addEventListener(`click`, onDisconnectHandler)
+
+    // 前端签名流程
+    async function onClickHandler() {
+        console.log("连接钱包")
+        
+        if (!window.ethereum) {
+            alert('请先安装MetaMask插件！');
+            return;
+        }
+        
+        try {
+            // 创建 viem 客户端
+            const publicClient = createPublicClient({
+                chain: mainnet,
+                transport: custom(window.ethereum)
+            });
+            
+            const walletClient = createWalletClient({
+                chain: mainnet,
+                transport: custom(window.ethereum)
+            });
+            
+            // 请求用户授权并获取钱包地址
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const account = accounts[0];
+            console.log(`钱包地址: ${account}`)
+            showAccount.innerHTML = account;
+
+            //从后台获取需要进行签名的数据
+            const nonce = auth(account);
+            showNonce.innerHTML = nonce;
+            console.log(`获取后台需要签名的数据: ${nonce}`)
+            
+            //签名
+            const signature = await walletClient.signMessage({ 
+                message: nonce.toString(),
+                account: account
+            });
+            showSignature.innerHTML = signature;
+            
+            //去后台验证签名，完成登录
+            console.log(`准备验证签名 - account: ${account}, signature: ${signature}`);
+            const signStatus = await verify(account, signature, publicClient);
+            showSignStatus.innerHTML = signStatus;
+            
+        } catch (error) {
+            console.error('操作失败:', error);
+            alert('操作失败: ' + error.message);
+        }
+    }
+
+    async function onDisconnectHandler() {
+        console.log("断开钱包连接")
+        // 清空显示的信息
+        showAccount.innerHTML = "未连接";
+        showNonce.innerHTML = "未连接";
+        showSignature.innerHTML = "未连接";
+        showSignStatus.innerHTML = "未连接";
+        
+        // 尝试断开连接（如果钱包支持）
+        if (window.ethereum && window.ethereum.removeAllListeners) {
+            window.ethereum.removeAllListeners();
+        }
+        
+        console.log("钱包已断开连接")
+    }
+
+    //==============================模拟后台服务=======================================
+
+    //假设这是后台的数据库，users表里保存了user对象，user对象包含用户的地址和关联的nonce
+    //{"address": 用户地址, "nonce": 返回给前端的随机数nonce}
+    const users = {}
+
+    /**
+     * 通过地址获取后端生成的随机数 nonce，用于签名
+     * @param address  用户地址
+     * @returns {number} 返回随机数 nonce
+     *
+     * 这个方法充当后台服务，从后台中获取需要签名的数据
+     */
+    function auth(address) {
+        let user = users[address]
+        if (!user) {
+            user = {
+                address,
+                nonce: Math.floor(Math.random() * 10000000)
+            }
+            users[address] = user
+        } else {
+            const nonce = Math.floor(Math.random() * 10000000)
+            user.nonce = nonce
+            users[address] = user
+        }
+        return user.nonce
+    }
+
+    /**
+     * 验证用户签名是否正确
+     * @param address   用户地址
+     * @param signature 签名数据
+     * @returns {boolean} 返回签名是否正确
+     *
+     * 这个方法充当后台服务，后台验证签名正确后，就返回相关登录态数据，完成登录流程
+     */
+    async function verify(address, signature, publicClient) {
+        let signValid = false
+        console.log(`address: ${address}`)
+        //从数据库中取出nonce
+        let nonce = users[address].nonce
+        console.log(`nonce: ${nonce}`)
+        
+        try {
+            //验证对nonce进行签名的地址
+            console.log(`验证签名 - message: ${nonce.toString()}, signature: ${signature}`);
+            
+            // 确保参数都是字符串类型
+            const message = nonce.toString();
+            const sig = signature.toString();
+            
+            console.log(`message: ${message}, type: ${typeof message}`);
+            console.log(`signature: ${sig}, type: ${typeof sig}`);
+            console.log(`signature length: ${sig.length}`);
+            
+            // 使用 recoverMessageAddress 恢复地址
+            console.log(`准备调用 recoverMessageAddress - message: "${message}", signature: "${sig}"`);
+            const recoveredAddress = await recoverMessageAddress({
+                message: message,
+                signature: sig
+            });
+            console.log(`recoveredAddress: ${recoveredAddress}`);
+            console.log(`recoveredAddress type: ${typeof recoveredAddress}`);
+            
+            //比较地址和签名的地址是否一致
+            if (typeof recoveredAddress === 'string' && address.toLowerCase() === recoveredAddress.toLowerCase()) {
+                signValid = true;
+                console.log('签名验证成功！');
+                //出于安全原因，更改nonce，防止下次直接使用相同的nonce进行登录
+                users[address].nonce = Math.floor(Math.random() * 10000000);
+            } else {
+                console.log('地址不匹配或类型错误');
+                console.log(`address: ${address}`);
+                console.log(`recoveredAddress: ${recoveredAddress}`);
+            }
+        } catch (error) {
+            console.error('签名验证失败:', error);
+            console.error('错误详情:', error.message);
+        }
+        
+        return signValid
+    }
+</script>
+</body>
+</html> 
