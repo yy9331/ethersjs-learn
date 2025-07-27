@@ -48,7 +48,8 @@ etherjs-viem-learn/
 ├── 17_MerkleTree_viem.js                       # Merkle 树 (viem)
 ├── 18_signature_ethersjs.js                    # 签名验证 (ethers.js)
 ├── 18_signature_viem.js                        # 签名验证 (viem)
-├── 19_mempool_ethersjs.js                      # 内存池
+├── 19_mempool_ethersjs.js                      # 内存池 (ethers.js)
+├── 19_mempool_viem.js                          # 内存池 (viem)
 ├── 20_decodePendingTx_ethersjs.js              # 解码待处理交易 (ethers.js)
 ├── 20_decodePendingTx_viem.js                  # 解码待处理交易 (viem)
 ├── 21_VanityAddr_ethersjs.js                   # 靓号地址
@@ -1087,6 +1088,71 @@ publicClient.watchPendingTransactions({
 });
 ```
 
+### **15. Mempool 监听对比**
+
+#### **Ethers.js 版本**
+```javascript
+// 创建 WebSocket provider
+const provider = new ethers.WebSocketProvider(process.env.SEPOLIA_WSSURL);
+
+// 监听 pending 交易
+provider.on("pending", async (txHash) => {
+    if (txHash && i < 100) {
+        console.log(`监听Pending交易 ${i}: ${txHash}`);
+        i++;
+    }
+});
+
+// 获取交易详情
+provider.on("pending", throttle(async (txHash) => {
+    if (txHash && j <= 100) {
+        let tx = await provider.getTransaction(txHash);
+        console.log(`监听Pending交易 ${j}: ${txHash}`);
+        console.log(tx);
+        j++;
+    }
+}, 1000));
+```
+
+#### **Viem 版本**
+```javascript
+// 创建 WebSocket 客户端
+const publicClient = createPublicClient({
+    chain: sepolia,
+    transport: webSocket(process.env.SEPOLIA_WSSURL)
+});
+
+// 监听 pending 交易
+publicClient.watchPendingTransactions({
+    onTransactions: async (txHashes) => {
+        for (const txHash of txHashes) {
+            if (txHash && i < 100) {
+                console.log(`监听Pending交易 ${i}: ${txHash}`);
+                i++;
+            }
+        }
+    }
+});
+
+// 获取交易详情
+publicClient.watchPendingTransactions({
+    onTransactions: throttle(async (txHashes) => {
+        for (const txHash of txHashes) {
+            if (txHash && j <= 100) {
+                try {
+                    let tx = await publicClient.getTransaction({ hash: txHash });
+                    console.log(`监听Pending交易 ${j}: ${txHash}`);
+                    console.log(tx);
+                    j++;
+                } catch (error) {
+                    console.log(`获取交易详情失败: ${error.message}`);
+                }
+            }
+        }
+    }, 1000)
+});
+```
+
 #### **主要区别说明**
 - **WebSocket 连接**：ethers.js 用 `WebSocketProvider`，viem 用 `webSocket()`。
 - **ABI 解析**：ethers.js 用 `Interface`，viem 用 `parseAbiItem()`。
@@ -1094,6 +1160,8 @@ publicClient.watchPendingTransactions({
 - **交易监听**：ethers.js 用 `provider.on('pending')`，viem 用 `watchPendingTransactions()`。
 - **交易解码**：ethers.js 用 `parseTransaction()`，viem 用 `decodeFunctionData()`。
 - **数据匹配**：ethers.js 用 `indexOf()`，viem 用 `startsWith()`。
+- **批量处理**：ethers.js 逐个处理交易，viem 批量处理交易哈希数组。
+- **错误处理**：viem 提供更完善的错误处理机制。
 
 #### **解码待处理交易的用途与心得**
 - **实时监控**：监控网络中的 pending 交易，获取最新交易信息。
@@ -1606,9 +1674,27 @@ console.log(`地址 ${from} 转账${amount} WETH 到地址 ${to}`);
 
 ### **Viem 事件监听限制说明**
 
-#### **Viem 的 WebSocket 限制**
+#### **Viem WebSocket 支持说明**
 
-Viem 的 `watchContractEvent` API 需要 WebSocket RPC 支持，但存在以下限制：
+根据 [Viem WebSocket 文档](https://learnblockchain.cn/docs/viem/docs/clients/transports/websocket/)，viem 完全支持 WebSocket 传输，包括：
+
+1. **实时交易监听**：`watchPendingTransactions()` 可以实时监听 pending 交易
+2. **事件监听**：`watchContractEvent()` 可以监听合约事件
+3. **块监听**：`watchBlocks()` 可以监听新区块
+4. **日志监听**：`watchLogs()` 可以监听日志事件
+
+#### **Viem 的 WebSocket 优势**
+
+相比 ethers.js，viem 的 WebSocket 支持有以下优势：
+
+1. **批量处理**：`watchPendingTransactions()` 返回交易哈希数组，可以批量处理
+2. **更好的错误处理**：提供更详细的错误信息和重连机制
+3. **类型安全**：完整的 TypeScript 支持
+4. **更现代的 API**：函数式编程风格，更易使用
+
+#### **WebSocket 使用限制**
+
+虽然 viem 支持 WebSocket，但仍存在以下限制：
 
 1. **免费 RPC 不支持**：大多数免费 RPC 服务只提供 HTTP 接口
 2. **需要付费服务**：WebSocket 支持通常需要 Alchemy、Infura 等付费服务
